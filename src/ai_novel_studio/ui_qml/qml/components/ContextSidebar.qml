@@ -16,12 +16,18 @@ Item {
             spacing: 6
 
             Text {
+                id: projectTitle
                 Layout.fillWidth: true
                 text: Facade.projectTitle
                 font.pixelSize: 15
                 font.bold: true
                 elide: Text.ElideRight
                 color: Theme.tokens.color.textPrimary
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: Facade.setActiveNav("writing")
+                }
             }
             Text {
                 text: Facade.chapterCount + " 章"

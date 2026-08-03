@@ -9,6 +9,7 @@ Item {
     objectName: "agentDock"
 
     property bool open: false
+    property int collapsedWidth: 34
     property int defaultWidth: 400
     property int minWidth: 320
     property int maxWidth: Math.max(320, Math.round(windowWidth * 0.45))
@@ -17,10 +18,18 @@ Item {
     property bool reduceMotion: Facade.reduceMotion
     signal closed()
 
-    Layout.preferredWidth: root.open ? root.currentWidth : 0
+    // UI state always follows the facade; QML never assigns `open` directly.
+    Layout.preferredWidth: root.open ? root.currentWidth : root.collapsedWidth
     Layout.fillHeight: true
+    Layout.minimumWidth: root.open ? root.minWidth : root.collapsedWidth
     Layout.maximumWidth: root.maxWidth
     clip: true
+
+    Behavior on Layout.preferredWidth {
+        NumberAnimation {
+            duration: root.reduceMotion ? 0 : Theme.tokens.duration.panel
+        }
+    }
 
     Rectangle {
         anchors.fill: parent
@@ -53,13 +62,14 @@ Item {
                     Math.min(root.maxWidth, next)
                 )
             }
-            onDoubleClicked: root.currentWidth = root.defaultWidth
+            onDoubleClicked: root.resetWidth()
         }
     }
 
     // Collapsed expand tab
     Rectangle {
         id: expandTab
+        objectName: "agentExpandTab"
         width: 34
         anchors.top: parent.top
         anchors.bottom: parent.bottom
@@ -78,10 +88,17 @@ Item {
         }
         MouseArea {
             anchors.fill: parent
-            onClicked: {
-                root.currentWidth = root.defaultWidth
-                root.open = true
-            }
+            onClicked: root.openFromTab()
         }
+    }
+
+    function openFromTab() {
+        // Restore the default width first so reopening is predictable.
+        root.currentWidth = root.defaultWidth
+        Facade.toggleAiDrawer(true)
+    }
+
+    function resetWidth() {
+        root.currentWidth = root.defaultWidth
     }
 }

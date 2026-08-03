@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 from ai_novel_studio.ui_qml.bridge.dtos import SelectionReferenceDto
+from ai_novel_studio.ui_qml.bridge.hash_utils import fnv1a_hash, sha256
 
 MAX_SELECTION_CHARACTERS = 20_000
 
@@ -40,7 +41,7 @@ def parse_selection_reference(payload_json: str) -> SelectionReferenceDto | None
         return None
     if not isinstance(selected_hash, str):
         return None
-    if not _hash_is_legal(selected_hash):
+    if not _hash_matches(selected_hash, selected_text):
         return None
     return SelectionReferenceDto(
         chapter_id=chapter_id,
@@ -52,11 +53,14 @@ def parse_selection_reference(payload_json: str) -> SelectionReferenceDto | None
     )
 
 
-def _hash_is_legal(value: str) -> bool:
+def _hash_matches(value: str, text: str) -> bool:
+    """Recompute the hash and require an exact match.
+
+    Format-only validation is not enough: a tampered payload could carry any
+    8-hex FNV fingerprint or 64-hex digest without matching ``text``.
+    """
     if value.startswith("fnv1a:"):
-        return len(value) == len("fnv1a:") + 8 and all(
-            char in "0123456789abcdef" for char in value[len("fnv1a:") :]
-        )
+        return value == fnv1a_hash(text)
     if len(value) == 64:
-        return all(char in "0123456789abcdef" for char in value)
+        return value == sha256(text)
     return False

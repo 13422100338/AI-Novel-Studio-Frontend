@@ -56,6 +56,12 @@ class UsageDto:
 
 @dataclass(frozen=True, slots=True)
 class DiscussionMessageDto:
+    """DEPRECATED (C1.1): legacy plot-discussion record.
+
+    Retained only for the deprecated DiscussionPanel compatibility path; new
+    AI interactions use ``AgentTimelineItemDto``.
+    """
+
     id: str
     role: str  # user | assistant
     text: str
@@ -67,14 +73,24 @@ class AgentTimelineItemDto:
 
     id: str
     kind: str  # user_text|assistant_text|run_status|tool_call|tool_result|
-    # choice_card|text_diff|confirmation|warning|error
+    # choice_card|text_diff|confirmation|form_card|change_set|warning|error
     text: str = ""
     label: str = ""
     busy: bool = False
     status: str = ""
+    # PENDING|RUNNING|COMPLETED|FAILED|CANCELLED|APPLIED|DISCARDED
+    state: str = ""
     options: tuple[str, ...] = ()
     current_text: str = ""
     draft_text: str = ""
+    field_labels: tuple[str, ...] = ()
+    field_values: tuple[str, ...] = ()
+    target: str = ""
+    operation: str = ""
+    before_text: str = ""
+    after_text: str = ""
+    risk: str = ""
+    reason: str = ""
     data: str = ""  # JSON-safe extra payload string
 
 

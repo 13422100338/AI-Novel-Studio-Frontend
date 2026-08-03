@@ -1,15 +1,16 @@
-"""Frontend Wave C1: Agent timeline model and Mock Agent flow."""
+"""Frontend Wave C1.1: Agent timeline model and Mock Agent flow."""
 
 import time
 
 from ai_novel_studio.ui_qml.bridge.dtos import AgentTimelineItemDto
+from ai_novel_studio.ui_qml.bridge.hash_utils import fnv1a_hash
 from ai_novel_studio.ui_qml.bridge.mock_novel_studio_facade import MockNovelStudioFacade
 from ai_novel_studio.ui_qml.bridge.models.agent_timeline_model import (
-    ROLE_BUSY,
-    ROLE_CURRENT_TEXT,
-    ROLE_DRAFT_TEXT,
     ROLE_KIND,
     ROLE_LABEL,
+    ROLE_OPERATION,
+    ROLE_STATE,
+    ROLE_TARGET,
     ROLE_TEXT,
     AgentTimelineModel,
 )
@@ -21,63 +22,80 @@ def _pump_until(app, facade: MockNovelStudioFacade, timeout: float) -> None:
         app.processEvents()
 
 
+def _kinds(facade: MockNovelStudioFacade) -> list[str]:
+    model = facade.property("agentTimeline")
+    return [
+        model.data(model.index(i), ROLE_KIND) for i in range(model.rowCount())
+    ]
+
+
+def _find_item(facade: MockNovelStudioFacade, kind: str) -> AgentTimelineItemDto:
+    model = facade.property("agentTimeline")
+    for i in range(model.rowCount()):
+        if model.data(model.index(i), ROLE_KIND) == kind:
+            return model.items()[i]
+    raise AssertionError(f"no {kind} event in timeline")
+
+
 def test_agent_timeline_model_roles() -> None:
     model = AgentTimelineModel()
     model.append_item(
         AgentTimelineItemDto(
             id="t1",
-            kind="text_diff",
-            label="修改对比",
-            current_text="原文",
-            draft_text="改稿",
-            busy=True,
+            kind="change_set",
+            label="变更提案",
+            target="人物 · 林默",
+            operation="更新",
+            before_text="码头工人",
+            after_text="退役水手",
+            risk="低",
+            reason="Mock 提案",
+            state="PENDING",
         )
     )
     index = model.index(0)
-    assert model.data(index, ROLE_KIND) == "text_diff"
-    assert model.data(index, ROLE_LABEL) == "修改对比"
-    assert model.data(index, ROLE_CURRENT_TEXT) == "原文"
-    assert model.data(index, ROLE_DRAFT_TEXT) == "改稿"
-    assert model.data(index, ROLE_BUSY) is True
-    assert model.data(index, ROLE_TEXT) == ""
-    assert model.roleNames()[ROLE_KIND] == b"kind"
+    assert model.data(index, ROLE_KIND) == "change_set"
+    assert model.data(index, ROLE_LABEL) == "变更提案"
+    assert model.data(index, ROLE_TARGET) == "人物 · 林默"
+    assert model.data(index, ROLE_OPERATION) == "更新"
+    assert model.data(index, ROLE_STATE) == "PENDING"
+    assert model.roleNames()[ROLE_STATE] == b"state"
 
 
 def test_mock_agent_emits_structured_timeline(qapp) -> None:
     facade = MockNovelStudioFacade()
 
     facade.startAgentTurn("帮我重写这段，让人物说话更自然。")
-    _pump_until(qapp, facade, 3.0)
+    _pump_until(qapp, facade, 5.0)
 
     assert facade.property("agentBusy") is False
-    model = facade.property("agentTimeline")
-    kinds = [
-        model.data(model.index(i), ROLE_KIND) for i in range(model.rowCount())
-    ]
+    kinds = _kinds(facade)
     assert kinds[0] == "user_text"
-    assert "run_status" in kinds
-    assert "tool_call" in kinds
-    assert "tool_result" in kinds
-    assert "text_diff" in kinds
-    assert "confirmation" in kinds
+    for expected in (
+        "run_status",
+        "tool_call",
+        "tool_result",
+        "text_diff",
+        "confirmation",
+        "form_card",
+        "change_set",
+    ):
+        assert expected in kinds, f"missing {expected} in {kinds}"
 
 
 def test_mock_agent_uses_selection_reference_in_diff(qapp) -> None:
     facade = MockNovelStudioFacade()
+    text = "清晨的雾港"
     facade.setSelectionReferenceJson(
-        '{"chapterId":"chapter-1","baseRevision":1,"from":0,"to":6,'
-        '"selectedText":"清晨的雾港","selectedTextHash":"fnv1a:00000000"}'
+        '{"chapterId":"chapter-1","baseRevision":3,"from":0,"to":6,'
+        f'"selectedText":"{text}","selectedTextHash":"{fnv1a_hash(text)}"}}'
     )
 
     facade.startAgentTurn("重写选区")
-    _pump_until(qapp, facade, 3.0)
+    _pump_until(qapp, facade, 5.0)
 
-    model = facade.property("agentTimeline")
-    for i in range(model.rowCount()):
-        if model.data(model.index(i), ROLE_KIND) == "text_diff":
-            assert "清晨的雾港" in model.data(model.index(i), ROLE_CURRENT_TEXT)
-            return
-    raise AssertionError("text_diff event not found")
+    diff = _find_item(facade, "text_diff")
+    assert "清晨的雾港" in diff.current_text
 
 
 def test_mock_agent_stop_keeps_partial_timeline(qapp) -> None:
@@ -85,23 +103,92 @@ def test_mock_agent_stop_keeps_partial_timeline(qapp) -> None:
 
     facade.startAgentTurn("取消测试")
     facade.stopAgentTurn()
-    _pump_until(qapp, facade, 2.0)
+    _pump_until(qapp, facade, 3.0)
 
     assert facade.property("agentBusy") is False
-    model = facade.property("agentTimeline")
-    kinds = [
-        model.data(model.index(i), ROLE_KIND) for i in range(model.rowCount())
-    ]
+    kinds = _kinds(facade)
     assert kinds[0] == "user_text"
     assert "warning" in kinds
 
 
-def test_agent_reply_choice_and_approve_append_assistant_text() -> None:
+def test_agent_item_actions_route_by_item_id_and_update_state() -> None:
+    facade = MockNovelStudioFacade()
+    model = facade.property("agentTimeline")
+    model.append_item(
+        AgentTimelineItemDto(
+            id="diff-a",
+            kind="text_diff",
+            label="修改对比",
+            current_text="原文",
+            draft_text="改稿",
+            state="PENDING",
+        )
+    )
+    model.append_item(
+        AgentTimelineItemDto(
+            id="diff-b",
+            kind="text_diff",
+            label="修改对比",
+            current_text="原文B",
+            draft_text="改稿B",
+            state="PENDING",
+        )
+    )
+
+    facade.approveAgentItem("diff-a")
+    assert model.items()[0].state == "APPLIED"
+    assert model.items()[1].state == "PENDING"
+
+    facade.discardAgentItem("diff-b")
+    assert model.items()[1].state == "DISCARDED"
+    assert model.items()[0].state == "APPLIED"
+
+    facade.retryAgentItem("diff-b")
+    assert model.items()[1].state == "RUNNING"
+
+
+def test_agent_confirmation_cancel_and_form_actions() -> None:
+    facade = MockNovelStudioFacade()
+    model = facade.property("agentTimeline")
+    model.append_item(
+        AgentTimelineItemDto(
+            id="confirm-1",
+            kind="confirmation",
+            label="确认操作",
+            text="替换选区 / 再次修改 / 放弃",
+            state="PENDING",
+        )
+    )
+    model.append_item(
+        AgentTimelineItemDto(
+            id="form-1",
+            kind="form_card",
+            label="补充设定",
+            field_labels=("人物名", "关系"),
+            field_values=("林默", "旧友"),
+            state="PENDING",
+        )
+    )
+
+    facade.cancelAgentItem("confirm-1")
+    assert model.items()[0].state == "CANCELLED"
+
+    facade.submitAgentForm("form-1", '["林默","挚友"]')
+    assert model.items()[1].state == "APPLIED"
+    assert "林默" in _kinds_text(facade)
+
+
+def test_agent_reply_choice_appends_assistant_text() -> None:
     facade = MockNovelStudioFacade()
     facade.agentReplyChoice(0)
-    facade.approveAgentChangeSet()
 
     model = facade.property("agentTimeline")
-    assert model.rowCount() == 2
+    assert model.rowCount() == 1
     assert model.data(model.index(0), ROLE_KIND) == "assistant_text"
-    assert model.data(model.index(1), ROLE_KIND) == "assistant_text"
+
+
+def _kinds_text(facade: MockNovelStudioFacade) -> str:
+    model = facade.property("agentTimeline")
+    return "\n".join(
+        str(model.data(model.index(i), ROLE_TEXT)) for i in range(model.rowCount())
+    )

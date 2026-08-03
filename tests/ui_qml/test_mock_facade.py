@@ -186,10 +186,30 @@ def test_drawer_toggle() -> None:
 
 def test_active_nav_validation() -> None:
     facade = MockNovelStudioFacade()
+    facade.setActiveNav("writing")
+    assert facade.property("activeNav") == "writing"
     facade.setActiveNav("memory")
     assert facade.property("activeNav") == "library"
+    facade.setActiveNav("clues")
+    assert facade.property("activeNav") == "advanced"
     facade.setActiveNav("unknown")
+    assert facade.property("activeNav") == "advanced"
+
+
+def test_select_chapter_returns_to_writing() -> None:
+    facade = MockNovelStudioFacade()
+    facade.setActiveNav("library")
     assert facade.property("activeNav") == "library"
+    facade.selectChapter(2)
+    assert facade.property("activeNav") == "writing"
+    assert facade.property("currentChapterId") == "chapter-2"
+
+
+def test_jump_to_memory_source_returns_to_writing() -> None:
+    facade = MockNovelStudioFacade()
+    facade.setActiveNav("library")
+    facade.jumpToMemorySource()
+    assert facade.property("activeNav") == "writing"
 
 
 def test_reduce_motion_toggle() -> None:

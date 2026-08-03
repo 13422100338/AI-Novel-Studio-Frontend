@@ -2,8 +2,9 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// TextArea-mode floating AI reference drawer. Content is the plot-discussion
-// chat panel; backend discussion wiring is a future connection point.
+// TextArea-mode floating AI reference drawer. Content is the same
+// CreativeAgentPanel used by AgentDock in WebEngine mode (C1.1 unification);
+// the legacy DiscussionPanel is no longer the default rendering path.
 Item {
     id: root
     z: 100
@@ -48,7 +49,7 @@ Item {
             NumberAnimation { duration: Facade.reduceMotion ? 0 : Theme.tokens.duration.panel }
         }
 
-        DiscussionPanel {
+        CreativeAgentPanel {
             anchors.fill: parent
         }
 

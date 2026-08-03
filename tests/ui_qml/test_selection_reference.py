@@ -1,44 +1,87 @@
-"""Frontend Wave C1: selection reference protocol (bridge + facade)."""
+"""Frontend Wave C1.1: selection reference protocol (bridge + facade)."""
 
 from ai_novel_studio.ui_qml.bridge.editor_bridge import EditorBridge
+from ai_novel_studio.ui_qml.bridge.hash_utils import fnv1a_hash, sha256
 from ai_novel_studio.ui_qml.bridge.mock_novel_studio_facade import MockNovelStudioFacade
 from ai_novel_studio.ui_qml.bridge.models.selection_reference import (
+    MAX_SELECTION_CHARACTERS,
     parse_selection_reference,
 )
 
-_VALID = (
-    '{"chapterId":"chapter-1","baseRevision":3,"from":10,"to":16,'
-    '"selectedText":"雾港的清晨","selectedTextHash":"fnv1a:abcdef12"}'
-)
+_SELECTED_TEXT = "雾港的清晨"
 
 
-def test_parse_selection_reference_accepts_valid_payload() -> None:
-    ref = parse_selection_reference(_VALID)
+def _valid_payload(
+    *,
+    chapter_id: str = "chapter-1",
+    base_revision: int = 3,
+    from_pos: int = 10,
+    to_pos: int = 16,
+    selected_text: str = _SELECTED_TEXT,
+    selected_hash: str | None = None,
+) -> str:
+    hash_value = (
+        selected_hash if selected_hash is not None else fnv1a_hash(selected_text)
+    )
+    return (
+        f'{{"chapterId":"{chapter_id}","baseRevision":{base_revision},'
+        f'"from":{from_pos},"to":{to_pos},'
+        f'"selectedText":"{selected_text}","selectedTextHash":"{hash_value}"}}'
+    )
+
+
+def test_parse_selection_reference_accepts_valid_fnv1a_payload() -> None:
+    ref = parse_selection_reference(_valid_payload())
     assert ref is not None
     assert ref.chapter_id == "chapter-1"
     assert ref.base_revision == 3
     assert ref.from_pos == 10
     assert ref.to_pos == 16
-    assert ref.selected_text == "雾港的清晨"
+    assert ref.selected_text == _SELECTED_TEXT
+
+
+def test_parse_selection_reference_accepts_valid_sha256_payload() -> None:
+    ref = parse_selection_reference(
+        _valid_payload(selected_hash=sha256(_SELECTED_TEXT))
+    )
+    assert ref is not None
+    assert ref.selected_text_hash == sha256(_SELECTED_TEXT)
+
+
+def test_parse_selection_reference_rejects_hash_content_mismatch() -> None:
+    # Correct format, wrong digest: must be rejected by recomputing the hash.
+    assert parse_selection_reference(
+        _valid_payload(selected_hash="fnv1a:00000000")
+    ) is None
+    assert parse_selection_reference(
+        _valid_payload(selected_hash="0" * 64)
+    ) is None
 
 
 def test_parse_selection_reference_rejects_invalid_payloads() -> None:
     assert parse_selection_reference("not json") is None
     assert parse_selection_reference("[]") is None
     assert parse_selection_reference(
-        '{"chapterId":"","baseRevision":1,"from":0,"to":1,"selectedText":"x","selectedTextHash":"fnv1a:00000000"}'
+        _valid_payload(chapter_id="")
     ) is None
     assert parse_selection_reference(
-        '{"chapterId":"c","baseRevision":-1,"from":0,"to":1,"selectedText":"x","selectedTextHash":"fnv1a:00000000"}'
+        _valid_payload(base_revision=-1)
     ) is None
     assert parse_selection_reference(
-        '{"chapterId":"c","baseRevision":1,"from":3,"to":1,"selectedText":"x","selectedTextHash":"fnv1a:00000000"}'
+        _valid_payload(from_pos=3, to_pos=1)
     ) is None
     assert parse_selection_reference(
-        '{"chapterId":"c","baseRevision":1,"from":0,"to":1,"selectedText":"","selectedTextHash":"fnv1a:00000000"}'
+        _valid_payload(from_pos=-2, to_pos=1)
     ) is None
     assert parse_selection_reference(
-        '{"chapterId":"c","baseRevision":1,"from":0,"to":1,"selectedText":"x","selectedTextHash":"bad"}'
+        _valid_payload(selected_text="")
+    ) is None
+    assert parse_selection_reference(
+        _valid_payload(selected_hash="bad")
+    ) is None
+    oversized = "字" * (MAX_SELECTION_CHARACTERS + 1)
+    assert parse_selection_reference(
+        _valid_payload(selected_text=oversized)
     ) is None
 
 
@@ -49,7 +92,7 @@ def test_bridge_forwards_valid_reference_and_errors_on_invalid() -> None:
     bridge.selection_reference_changed.connect(emitted.append)
     bridge.error.connect(lambda code, message: errors.append((code, message)))
 
-    bridge.selectionReferenceChanged(_VALID)
+    bridge.selectionReferenceChanged(_valid_payload())
     assert len(emitted) == 1
 
     bridge.selectionReferenceChanged("")
@@ -60,20 +103,47 @@ def test_bridge_forwards_valid_reference_and_errors_on_invalid() -> None:
     assert len(errors) == 1
     assert errors[0][0] == "INVALID_SELECTION_REFERENCE"
 
+    bridge.selectionReferenceChanged(
+        _valid_payload(selected_hash="fnv1a:00000000")
+    )
+    assert len(errors) == 2
+    assert errors[1][0] == "INVALID_SELECTION_REFERENCE"
+
 
 def test_facade_selection_reference_lifecycle() -> None:
     facade = MockNovelStudioFacade()
     assert facade.property("hasSelectionReference") is False
 
-    facade.setSelectionReferenceJson(_VALID)
+    facade.setSelectionReferenceJson(_valid_payload())
     assert facade.property("hasSelectionReference") is True
-    assert "雾港的清晨" in facade.property("selectionReferencePreview")
+    assert _SELECTED_TEXT in facade.property("selectionReferencePreview")
     assert "字" in facade.property("selectionReferenceLabel")
 
     facade.clearSelectionReference()
     assert facade.property("hasSelectionReference") is False
 
-    facade.setSelectionReferenceJson(_VALID)
+    facade.setSelectionReferenceJson(_valid_payload())
     facade.selectChapter(1)
     assert facade.property("hasSelectionReference") is False
 
+
+def test_facade_rejects_stale_chapter_and_revision() -> None:
+    facade = MockNovelStudioFacade()
+
+    facade.setSelectionReferenceJson(_valid_payload(chapter_id="chapter-2"))
+    assert facade.property("hasSelectionReference") is False
+    assert "过期" in facade.property("saveStatusText")
+
+    facade.setSelectionReferenceJson(_valid_payload(base_revision=2))
+    assert facade.property("hasSelectionReference") is False
+    assert "过期" in facade.property("saveStatusText")
+
+    facade.setSelectionReferenceJson(_valid_payload())
+    assert facade.property("hasSelectionReference") is True
+
+
+def test_empty_payload_clears_reference() -> None:
+    facade = MockNovelStudioFacade()
+    facade.setSelectionReferenceJson(_valid_payload())
+    facade.setSelectionReferenceJson("")
+    assert facade.property("hasSelectionReference") is False

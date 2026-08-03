@@ -68,7 +68,6 @@ from ai_novel_studio.ui_qml.bridge.text_utils import count_words, format_word_co
 
 _NAV_IDS = ("writing", "library", "advanced", "settings")
 _NAV_ALIASES = {
-    "writing": "library",
     "characters": "library",
     "memory": "library",
     "clues": "advanced",
@@ -86,6 +85,8 @@ _AGENT_KINDS = {
     "choice_card",
     "text_diff",
     "confirmation",
+    "form_card",
+    "change_set",
     "warning",
     "error",
 }
@@ -536,6 +537,7 @@ class MockNovelStudioFacade(QObject):
         self.chapter_changed.emit()
         self.chapterChanged.emit()
         self.editor_state_changed.emit()
+        self.setActiveNav("writing")
 
     @Slot(str)
     def editorTextChanged(self, text: str) -> None:
@@ -992,7 +994,11 @@ class MockNovelStudioFacade(QObject):
 
     @Slot(str)
     def sendDiscussion(self, text: str) -> None:
-        """Send a plot-discussion turn (mock response; real port later)."""
+        """DEPRECATED (C1.1): legacy plot-discussion path, no longer rendered.
+
+        Kept only for compatibility with the deprecated DiscussionPanel; the
+        default AI surface is the Agent timeline via ``startAgentTurn``.
+        """
         normalized = text.strip()
         if not normalized or self._discussion_busy:
             return
@@ -1014,6 +1020,7 @@ class MockNovelStudioFacade(QObject):
 
     @Slot()
     def clearDiscussion(self) -> None:
+        """DEPRECATED (C1.1): see ``sendDiscussion``."""
         self._discussion_model.clear()
         self.discussion_changed.emit()
 
@@ -1056,6 +1063,18 @@ class MockNovelStudioFacade(QObject):
             return
         reference = parse_selection_reference(payload_json)
         if reference is None:
+            return
+        current_chapter_id = self._chapters[self._current_index].id
+        if (
+            reference.chapter_id != current_chapter_id
+            or reference.base_revision != self._revision
+        ):
+            # Stale selection: the editor may still hold a previous chapter or
+            # revision. Reject and clear so the AI panel never acts on it.
+            self._selection_reference = None
+            self._save_status = "选区引用已过期（章节或修订已变化），已清除"
+            self.editor_state_changed.emit()
+            self.selection_reference_changed.emit()
             return
         self._selection_reference = reference
         self.selection_reference_changed.emit()
@@ -1106,15 +1125,53 @@ class MockNovelStudioFacade(QObject):
                 f"你选择了：{options[choice]}（Mock 分支，真实决策需 Agent 后端）"
             )
 
-    @Slot()
-    def approveAgentChangeSet(self) -> None:
+    @Slot(str)
+    def approveAgentItem(self, item_id: str) -> None:
+        """Approve exactly one proposal identified by ``item_id``."""
+        self._replace_agent_item(item_id, state="APPLIED")
         self._append_agent_text(
-            "确认了修改方案。真实替换将在后续 Wave 接入（修订与哈希校验协议已预留）。"
+            "已确认该修改方案。真实替换将在后续 Wave 接入（修订与哈希校验协议已预留）。"
         )
 
-    @Slot()
-    def discardAgentChangeSet(self) -> None:
+    @Slot(str)
+    def retryAgentItem(self, item_id: str) -> None:
+        """Retry exactly one proposal identified by ``item_id``."""
+        self._replace_agent_item(item_id, state="RUNNING")
+        self._append_agent_text("已收到再次修改请求，正在按新要求生成（Mock 分支）。")
+
+    @Slot(str)
+    def discardAgentItem(self, item_id: str) -> None:
+        """Discard exactly one proposal identified by ``item_id``."""
+        self._replace_agent_item(item_id, state="DISCARDED")
         self._append_agent_text("已放弃该修改方案，正文保持不变。")
+
+    @Slot(str)
+    def cancelAgentItem(self, item_id: str) -> None:
+        """Cancel a pending confirmation or form without applying anything."""
+        self._replace_agent_item(item_id, state="CANCELLED")
+        self._append_agent_text("已取消确认，未执行任何修改。")
+
+    @Slot(str, str)
+    def submitAgentForm(self, item_id: str, values_json: str) -> None:
+        """Record a mock form submission; nothing is persisted in C1."""
+        self._replace_agent_item(item_id, state="APPLIED")
+        preview = values_json[:120]
+        self._append_agent_text(f"已保存表单 {preview}（Mock 保存，未写入项目）")
+
+    @Slot(str)
+    def skipAgentForm(self, item_id: str) -> None:
+        self._replace_agent_item(item_id, state="DISCARDED")
+        self._append_agent_text("已跳过该表单。")
+
+    @Slot(str)
+    def editAgentChangeSet(self, item_id: str) -> None:
+        self._replace_agent_item(item_id, state="RUNNING")
+        self._append_agent_text("编辑模式将在真实 Agent 接线后启用，当前保留 Mock 提案。")
+
+    @Slot()
+    def jumpToMemorySource(self) -> None:
+        """Return to the writing page from a memory detail (source chapter)."""
+        self.setActiveNav("writing")
 
     def _schedule_agent_step(self) -> None:
         self._stop_agent_timer()
@@ -1137,6 +1194,7 @@ class MockNovelStudioFacade(QObject):
                     label="正在读取当前章节和选区",
                     busy=True,
                     status="RUNNING",
+                    state="RUNNING",
                 )
             )
         elif self._agent_step == 1:
@@ -1146,6 +1204,7 @@ class MockNovelStudioFacade(QObject):
                     kind="tool_call",
                     label="read_selection",
                     text="读取正文选区与章节修订",
+                    state="COMPLETED",
                 )
             )
         elif self._agent_step == 2:
@@ -1159,6 +1218,7 @@ class MockNovelStudioFacade(QObject):
                         f"已读取 {self.currentChapterTitle} "
                         f"{len(ref.selected_text) if ref else 0} 字"
                     ),
+                    state="COMPLETED",
                 )
             )
         elif self._agent_step == 3:
@@ -1169,6 +1229,7 @@ class MockNovelStudioFacade(QObject):
                     label="正在生成修改稿",
                     busy=False,
                     status="DONE",
+                    state="COMPLETED",
                 )
             )
         elif self._agent_step == 4:
@@ -1186,6 +1247,7 @@ class MockNovelStudioFacade(QObject):
                     draft_text=(
                         "（Mock 修改稿）" + current[:40] + "…请人工确认后再替换。"
                     ),
+                    state="PENDING",
                 )
             )
         elif self._agent_step == 5:
@@ -1195,6 +1257,34 @@ class MockNovelStudioFacade(QObject):
                     kind="confirmation",
                     label="确认操作",
                     text="替换选区 / 再次修改 / 放弃",
+                    state="PENDING",
+                )
+            )
+        elif self._agent_step == 6:
+            steps.append(
+                AgentTimelineItemDto(
+                    id=str(uuid4()),
+                    kind="form_card",
+                    label="补充设定",
+                    text="请补充人物关系设定（Mock 表单，不写入项目）",
+                    field_labels=("人物名", "关系", "备注"),
+                    field_values=("林默", "旧友", "待确认"),
+                    state="PENDING",
+                )
+            )
+        elif self._agent_step == 7:
+            steps.append(
+                AgentTimelineItemDto(
+                    id=str(uuid4()),
+                    kind="change_set",
+                    label="变更提案",
+                    target="人物 · 林默",
+                    operation="更新",
+                    before_text="码头工人",
+                    after_text="退役水手",
+                    risk="低",
+                    reason="Mock 提案：人物设定与第一章背景冲突",
+                    state="PENDING",
                 )
             )
         else:
@@ -1206,11 +1296,21 @@ class MockNovelStudioFacade(QObject):
             self._agent_timeline_model.append_item(step)
         self._agent_step += 1
         self.agent_timeline_changed.emit()
-        if self._agent_step <= 5:
+        if self._agent_step <= 7:
             self._schedule_agent_step()
         else:
             self._agent_busy = False
             self.agent_busy_changed.emit()
+
+    def _replace_agent_item(self, item_id: str, **changes: Any) -> None:
+        """Replace one timeline item with ``changes`` applied (state updates)."""
+        items = list(self._agent_timeline_model.items())
+        for index, item in enumerate(items):
+            if item.id == item_id:
+                items[index] = replace(item, **changes)
+                self._agent_timeline_model.set_items(items)
+                self.agent_timeline_changed.emit()
+                return
 
     def _append_agent_text(self, text: str) -> None:
         self._agent_timeline_model.append_item(
@@ -1256,6 +1356,7 @@ class MockNovelStudioFacade(QObject):
         if self._chapters:
             self._current_index = 0
             self._load_current_chapter_document()
+        self.setActiveNav("writing")
         self.project_changed.emit()
         self.chapter_changed.emit()
         self.chapterChanged.emit()
@@ -1281,6 +1382,7 @@ class MockNovelStudioFacade(QObject):
         self._current_index = 0
         self._load_current_chapter_document()
         self._refresh_overview()
+        self.setActiveNav("writing")
         self.project_changed.emit()
         self.chapter_changed.emit()
         self.chapterChanged.emit()

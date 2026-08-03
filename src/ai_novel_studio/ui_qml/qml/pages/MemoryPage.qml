@@ -127,6 +127,11 @@ Item {
                             color: Theme.tokens.color.textPrimary
                         }
                         AppButton {
+                            objectName: "memorySourceJumpButton"
+                            text: "在正文中定位"
+                            onClicked: Facade.jumpToMemorySource()
+                        }
+                        AppButton {
                             objectName: "closeMemoryDetailButton"
                             text: "关闭"
                             onClicked: Facade.closeMemoryDetail()

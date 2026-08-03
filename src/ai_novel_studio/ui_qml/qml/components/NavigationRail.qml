@@ -25,6 +25,7 @@ Item {
 
         Repeater {
             model: [
+                { id: "writing", icon: "\u270E", label: "写作" },
                 { id: "library", icon: "\u25A4", label: "记忆库" },
                 { id: "advanced", icon: "\u2726", label: "高级创作" },
                 { id: "settings", icon: "\u2699", label: "设置" }

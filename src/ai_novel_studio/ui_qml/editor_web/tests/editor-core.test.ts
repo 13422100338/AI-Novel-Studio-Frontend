@@ -9,6 +9,7 @@ import {
   insertTextAt,
   redoState,
   replaceAll,
+  selectionText,
   stateToMarkdown,
   typeText,
   undoState,
@@ -144,5 +145,18 @@ describe("selection reference (C1)", () => {
   it("caps oversized selections", () => {
     const huge = "字".repeat(30_000);
     expect(buildSelectionReference("c1", 1, 0, 30_000, huge)).toBeNull();
+  });
+});
+
+describe("selection text (C1.1)", () => {
+  it("keeps a newline between paragraphs instead of concatenating them", () => {
+    const state = createNovelState("第一段。\n\n第二段。");
+    const text = selectionText(state, 0, state.doc.content.size);
+    expect(text).toBe("第一段。\n第二段。");
+  });
+
+  it("returns empty for a collapsed cursor", () => {
+    const state = createNovelState("第一段。\n\n第二段。");
+    expect(selectionText(state, 3, 3)).toBe("");
   });
 });

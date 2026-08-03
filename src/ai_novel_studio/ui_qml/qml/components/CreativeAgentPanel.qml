@@ -6,6 +6,7 @@ import QtQuick.Layouts
 // Card types are rendered through a component map; no giant delegate.
 Item {
     id: root
+    objectName: "creativeAgentPanel"
 
     ColumnLayout {
         anchors.fill: parent
@@ -30,6 +31,13 @@ Item {
                     ? Theme.tokens.color.accent
                     : Theme.tokens.color.success
             }
+            AppButton {
+                objectName: "agentCloseButton"
+                text: "×"
+                implicitWidth: 28
+                implicitHeight: 24
+                onClicked: Facade.toggleAiDrawer(false)
+            }
         }
 
         Rectangle {
@@ -48,41 +56,93 @@ Item {
             ScrollBar.vertical: ScrollBar {}
 
             delegate: Loader {
+                id: delegateLoader
                 width: timeline.width
                 sourceComponent: root.componentFor(kind)
 
                 onLoaded: {
-                    const item = item
-                    if (item === null) {
+                    const loadedItem = delegateLoader.item
+                    if (loadedItem === null) {
                         return
                     }
                     if (kind === "user_text" || kind === "assistant_text") {
-                        item.text = text
-                        item.user = kind === "user_text"
+                        loadedItem.text = text
+                        loadedItem.user = kind === "user_text"
                     } else if (kind === "run_status") {
-                        item.label = label
-                        item.busy = busy
-                        item.status = status
+                        loadedItem.label = label
+                        loadedItem.busy = busy
+                        loadedItem.status = status
                     } else if (kind === "tool_call" || kind === "tool_result") {
-                        item.label = label
-                        item.text = text
+                        loadedItem.label = label
+                        loadedItem.text = text
                     } else if (kind === "choice_card") {
-                        item.options = options
-                        item.chosen.connect(function(choice) {
+                        loadedItem.options = options
+                        loadedItem.chosen.connect(function(choice) {
                             Facade.agentReplyChoice(choice)
                         })
                     } else if (kind === "text_diff") {
-                        item.label = label
-                        item.currentText = currentText
-                        item.draftText = draftText
-                        item.approve.connect(Facade.approveAgentChangeSet)
-                        item.discard.connect(Facade.discardAgentChangeSet)
+                        loadedItem.itemId = itemId
+                        loadedItem.state = state
+                        loadedItem.label = label
+                        loadedItem.currentText = currentText
+                        loadedItem.draftText = draftText
+                        loadedItem.approve.connect(function() {
+                            Facade.approveAgentItem(itemId)
+                        })
+                        loadedItem.retry.connect(function() {
+                            Facade.retryAgentItem(itemId)
+                        })
+                        loadedItem.discard.connect(function() {
+                            Facade.discardAgentItem(itemId)
+                        })
                     } else if (kind === "confirmation") {
-                        item.label = label
-                        item.text = text
-                        item.confirm.connect(Facade.approveAgentChangeSet)
+                        loadedItem.itemId = itemId
+                        loadedItem.state = state
+                        loadedItem.label = label
+                        loadedItem.text = text
+                        loadedItem.confirm.connect(function() {
+                            Facade.approveAgentItem(itemId)
+                        })
+                        loadedItem.cancel.connect(function() {
+                            Facade.cancelAgentItem(itemId)
+                        })
+                    } else if (kind === "form_card") {
+                        loadedItem.itemId = itemId
+                        loadedItem.state = state
+                        loadedItem.title = label
+                        loadedItem.description = text
+                        loadedItem.fieldLabels = fieldLabels
+                        loadedItem.fieldValues = fieldValues
+                        loadedItem.submitted.connect(function(valuesJson) {
+                            Facade.submitAgentForm(itemId, valuesJson)
+                        })
+                        loadedItem.skipped.connect(function() {
+                            Facade.skipAgentForm(itemId)
+                        })
+                        loadedItem.cancelled.connect(function() {
+                            Facade.cancelAgentItem(itemId)
+                        })
+                    } else if (kind === "change_set") {
+                        loadedItem.itemId = itemId
+                        loadedItem.state = state
+                        loadedItem.label = label
+                        loadedItem.target = target
+                        loadedItem.operation = operation
+                        loadedItem.beforeText = beforeText
+                        loadedItem.afterText = afterText
+                        loadedItem.risk = risk
+                        loadedItem.reason = reason
+                        loadedItem.approve.connect(function() {
+                            Facade.approveAgentItem(itemId)
+                        })
+                        loadedItem.edit.connect(function() {
+                            Facade.editAgentChangeSet(itemId)
+                        })
+                        loadedItem.discard.connect(function() {
+                            Facade.discardAgentItem(itemId)
+                        })
                     } else if (kind === "warning" || kind === "error") {
-                        item.text = text
+                        loadedItem.text = text
                     }
                 }
             }
@@ -128,6 +188,10 @@ Item {
             return textDiffComponent
         case "confirmation":
             return confirmationComponent
+        case "form_card":
+            return formCardComponent
+        case "change_set":
+            return changeSetComponent
         case "warning":
         case "error":
             return warningComponent
@@ -159,6 +223,14 @@ Item {
     Component {
         id: confirmationComponent
         ConfirmationCard {}
+    }
+    Component {
+        id: formCardComponent
+        FormCard {}
+    }
+    Component {
+        id: changeSetComponent
+        ChangeSetCard {}
     }
     Component {
         id: warningComponent

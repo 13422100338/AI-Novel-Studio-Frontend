@@ -4,13 +4,19 @@ import QtQuick.Layouts
 
 Rectangle {
     id: root
+    objectName: "textDiffCard"
 
+    property string itemId: ""
+    property string state: ""
     property string label: ""
     property string currentText: ""
     property string draftText: ""
     signal approve()
     signal retry()
     signal discard()
+
+    readonly property bool settled:
+        state === "APPLIED" || state === "DISCARDED" || state === "CANCELLED"
 
     width: parent ? parent.width : 320
     implicitHeight: Math.max(40, column.implicitHeight + 12)
@@ -50,9 +56,22 @@ Rectangle {
             spacing: 6
 
             Item { Layout.fillWidth: true }
-            AppButton { text: "放弃"; onClicked: root.discard() }
-            AppButton { text: "再次修改"; onClicked: root.retry() }
-            AppButton { text: "确认替换"; primary: true; onClicked: root.approve() }
+            AppButton {
+                text: "放弃"
+                enabled: !root.settled
+                onClicked: root.discard()
+            }
+            AppButton {
+                text: "再次修改"
+                enabled: !root.settled
+                onClicked: root.retry()
+            }
+            AppButton {
+                text: "确认替换"
+                primary: true
+                enabled: !root.settled
+                onClicked: root.approve()
+            }
         }
     }
 }

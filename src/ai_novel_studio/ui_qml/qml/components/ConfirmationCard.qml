@@ -3,11 +3,17 @@ import QtQuick.Layouts
 
 Rectangle {
     id: root
+    objectName: "confirmationCard"
 
+    property string itemId: ""
+    property string state: ""
     property string label: ""
     property string text: ""
     signal confirm()
     signal cancel()
+
+    readonly property bool settled:
+        state === "APPLIED" || state === "DISCARDED" || state === "CANCELLED"
 
     width: parent ? parent.width : 320
     implicitHeight: Math.max(30, row.implicitHeight + 12)
@@ -37,7 +43,16 @@ Rectangle {
                 color: Theme.tokens.color.textSecondary
             }
         }
-        AppButton { text: "取消"; onClicked: root.cancel() }
-        AppButton { text: "确认"; primary: true; onClicked: root.confirm() }
+        AppButton {
+            text: "取消"
+            enabled: !root.settled
+            onClicked: root.cancel()
+        }
+        AppButton {
+            text: "确认"
+            primary: true
+            enabled: !root.settled
+            onClicked: root.confirm()
+        }
     }
 }

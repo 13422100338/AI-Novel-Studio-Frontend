@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from PySide6.QtCore import QMetaObject, QUrl
+import pytest
+from PySide6.QtCore import QByteArray, QMetaObject, QUrl
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickItem
 from pytestqt.qtbot import QtBot
@@ -11,6 +12,22 @@ from ai_novel_studio.ui_qml.bridge.mock_novel_studio_facade import MockNovelStud
 from ai_novel_studio.ui_qml.bridge.theme_provider import ThemeProvider
 
 from .test_mock_facade import FakeDraftPort
+
+_ACTIVE_ENGINES: list[QQmlApplicationEngine] = []
+
+
+@pytest.fixture(autouse=True)
+def _delete_active_engines() -> None:
+    """Destroy QML engines deterministically after each test.
+
+    Leaving engines alive across tests lets Qt deliver queued model/view
+    events during an unrelated test, which surfaces as spurious
+    QAbstractListModel errors in teardown.
+    """
+    yield
+    for engine in _ACTIVE_ENGINES:
+        engine.deleteLater()
+    _ACTIVE_ENGINES.clear()
 
 
 def _create_temp_project(root: Path) -> Path:
@@ -74,6 +91,7 @@ def _load_engine(
     register_frontend_types(engine, facade, theme)
     engine.load(QUrl.fromLocalFile(str(app_qml_path())))
     assert engine.rootObjects(), "App.qml failed to load"
+    _ACTIVE_ENGINES.append(engine)
     return engine, facade, theme
 
 
@@ -163,6 +181,105 @@ def test_navigation_rail_button_switches_page(qtbot: QtBot) -> None:
     assert library_button is not None
     QMetaObject.invokeMethod(library_button, "clicked")
     assert facade.property("activeNav") == "library"
+
+
+def test_navigation_writing_button_returns_to_writing(qtbot: QtBot) -> None:
+    engine, facade, _ = _load_engine(qtbot)
+    window = engine.rootObjects()[0]
+    facade.setActiveNav("library")
+    writing_button = _find_quick_item(window.contentItem(), "nav-writing")
+    assert writing_button is not None
+    QMetaObject.invokeMethod(writing_button, "clicked")
+    assert facade.property("activeNav") == "writing"
+
+
+def test_chapter_click_returns_to_writing(qtbot: QtBot) -> None:
+    engine, facade, _ = _load_engine(qtbot)
+    facade.setActiveNav("library")
+    facade.selectChapter(3)
+    assert facade.property("activeNav") == "writing"
+    assert facade.property("currentChapterId") == "chapter-3"
+
+
+def test_textarea_host_renders_creative_agent_panel(qtbot: QtBot) -> None:
+    engine, facade, _ = _load_engine(qtbot)
+    window = engine.rootObjects()[0]
+    facade.toggleAiDrawer(True)
+    panel = _find_visible_quick_item(window.contentItem(), "creativeAgentPanel")
+    assert panel is not None
+    assert window.findChild(object, "aiDrawer") is not None
+
+
+def test_agent_dock_open_close_and_collapse(qtbot: QtBot) -> None:
+    """AgentDock interactions are facade-driven and keep a visible expand tab."""
+    engine = QQmlApplicationEngine()
+    _ACTIVE_ENGINES.append(engine)
+    engine.addImportPath(str(Path(app_qml_path()).parent))
+    facade = MockNovelStudioFacade()
+    theme = ThemeProvider()
+    register_frontend_types(engine, facade, theme)
+    engine.loadData(
+        QByteArray(
+            b"""
+            import QtQuick
+            import QtQuick.Controls
+            import QtQuick.Layouts
+            import "components"
+            ApplicationWindow {
+                width: 1440
+                height: 900
+                visible: true
+                RowLayout {
+                    anchors.fill: parent
+                    AgentDock {
+                        open: Facade.aiDrawerOpen
+                        windowWidth: 1440
+                        Layout.fillHeight: true
+                    }
+                }
+            }
+            """
+        ),
+        QUrl.fromLocalFile(str(Path(app_qml_path()).parent / "dock-harness.qml")),
+    )
+    root = engine.rootObjects()[0]
+    assert root is not None
+    root.show()
+    qtbot.waitUntil(lambda: root.width() > 0)
+    dock = _find_quick_item(root.contentItem(), "agentDock")
+    assert dock is not None
+
+    assert dock.property("width") == 34
+    tab = _find_quick_item(root.contentItem(), "agentExpandTab")
+    assert tab is not None
+    assert tab.property("visible") is True
+
+    # Open through the facade (never by direct `root.open` assignment).
+    facade.toggleAiDrawer(True)
+    qtbot.waitUntil(lambda: dock.property("width") == 400)
+    assert tab.property("visible") is False
+
+    # Close through the panel header button; the expand tab must return.
+    close_button = _find_quick_item(root.contentItem(), "agentCloseButton")
+    assert close_button is not None
+    QMetaObject.invokeMethod(close_button, "clicked")
+    qtbot.waitUntil(lambda: facade.property("aiDrawerOpen") is False)
+    qtbot.waitUntil(lambda: dock.property("width") == 34)
+    assert tab.property("visible") is True
+
+    # Reopen from the tab.
+    QMetaObject.invokeMethod(dock, "openFromTab")
+    qtbot.waitUntil(lambda: facade.property("aiDrawerOpen") is True)
+    qtbot.waitUntil(lambda: dock.property("width") == 400)
+    assert tab.property("visible") is False
+
+    # Width restore respects the configured bounds.
+    dock.setProperty("currentWidth", 10_000)
+    qtbot.waitUntil(lambda: dock.property("width") == 648)
+    dock.setProperty("currentWidth", 0)
+    qtbot.waitUntil(lambda: dock.property("width") == 320)
+    QMetaObject.invokeMethod(dock, "resetWidth")
+    qtbot.waitUntil(lambda: dock.property("width") == 400)
 
 
 def test_sidebar_search_filters_chapter_list(qtbot: QtBot) -> None:
@@ -300,10 +417,12 @@ def test_project_draft_button_uses_injected_port(
     engine, facade, _ = _load_engine(qtbot, facade)
     window = engine.rootObjects()[0]
     editor = window.findChild(object, "manuscriptEditor")
-    draft_button = window.findChild(object, "draftButton")
+    menu_button = window.findChild(object, "chapterMenuButton")
+    generate_item = window.findChild(object, "generateDraftMenuItem")
     start_button = window.findChild(object, "startGenerationButton")
 
-    QMetaObject.invokeMethod(draft_button, "clicked")
+    QMetaObject.invokeMethod(menu_button, "clicked")
+    QMetaObject.invokeMethod(generate_item, "triggered")
     qtbot.waitUntil(
         lambda: window.findChild(object, "startGenerationButton") is not None
         and window.findChild(object, "generationConfigDialog").property("visible"),
@@ -362,7 +481,7 @@ def test_generation_config_dialog_applies_values_before_start(
     )
 
 
-def test_usage_chips_visible_and_update_after_generation(
+def test_usage_values_update_after_generation(
     qtbot: QtBot, tmp_path: Path
 ) -> None:
     root = _create_temp_project(tmp_path / "novel")
@@ -372,9 +491,8 @@ def test_usage_chips_visible_and_update_after_generation(
     engine, facade, _ = _load_engine(qtbot, facade)
     window = engine.rootObjects()[0]
 
-    for name in ("usageTokensChip", "usageCostChip", "usageCacheChip"):
-        assert window.findChild(object, name) is not None, f"missing {name}"
-    assert window.findChild(object, "usageTokensChip").property("value") == "0 / 0"
+    assert facade.property("usageInputOutputText") == "0 / 0"
+    assert window.findChild(object, "statusMoreMenu") is not None
 
     facade.requestDraft()
     qtbot.waitUntil(
@@ -382,11 +500,10 @@ def test_usage_chips_visible_and_update_after_generation(
         timeout=5000,
     )
 
-    assert window.findChild(object, "usageTokensChip").property("value") == "1.2K / 800"
-    assert window.findChild(object, "usageCostChip").property("value") == "¥0.018"
-    assert window.findChild(object, "usageCacheChip").property("value") == "缓存 600"
-    tokens_chip = window.findChild(object, "usageTokensChip")
-    assert tokens_chip.property("tooltipText") == "输入 / 输出 · 1 次调用"
+    assert facade.property("usageInputOutputText") == "1.2K / 800"
+    assert facade.property("usageCostText") == "¥0.018"
+    assert facade.property("usageCacheText") == "缓存 600"
+    assert facade.property("usageCallsText") == "1 次调用"
 
 
 def test_overview_pages_exist_and_show_counts(qtbot: QtBot, tmp_path: Path) -> None:
@@ -511,6 +628,9 @@ def test_memory_detail_panel_shows_after_selection(
     assert detail is not None
 
     facade.setActiveNav("memory")
+    memory_tabs = window.findChild(object, "memoryLibraryTabs")
+    assert memory_tabs is not None
+    memory_tabs.setProperty("currentIndex", 2)
     facade.selectMemory(0)
 
     assert facade.property("memoryDetailVisible") is True

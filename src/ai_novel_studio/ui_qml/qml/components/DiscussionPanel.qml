@@ -2,9 +2,9 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Plot-discussion chat panel that fills the AI reference drawer content.
-// Frontend-isolated: replies are deterministic mocks until the backend
-// discussion port is wired.
+// DEPRECATED (C1.1): legacy plot-discussion chat panel. Kept for reference
+// and compatibility only; the default AI surface is CreativeAgentPanel in
+// both AgentDock (WebEngine) and SlidingDrawer (TextArea) hosts.
 Item {
     id: root
 

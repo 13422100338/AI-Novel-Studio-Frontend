@@ -21,6 +21,7 @@ Item {
 
         TabBar {
             id: tabs
+            objectName: "memoryLibraryTabs"
             Layout.fillWidth: true
             Repeater {
                 model: ["角色", "世界", "剧情记忆", "待处理"]

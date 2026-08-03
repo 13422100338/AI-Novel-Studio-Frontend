@@ -25,6 +25,9 @@ def test_generate_completes_on_background_thread(qtbot: QtBot) -> None:
         coordinator.start_generate("run-1")
 
     assert blocker.args == ["草稿正文"]
+    # `draft_ready` and the terminal `status_changed` are delivered as separate
+    # queued events; wait for the status event instead of asserting immediately.
+    qtbot.waitUntil(lambda: coordinator.status == DRAFT_COMPLETED, timeout=5000)
     assert coordinator.status == DRAFT_COMPLETED
     assert coordinator.is_running is False
     assert coordinator.run_id is None

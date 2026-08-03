@@ -62,11 +62,13 @@ Item {
                 onTriggered: Facade.setSaveStatusText("章节信息面板将在后续 Wave 接线。")
             }
             MenuItem {
+                objectName: "generateDraftMenuItem"
                 text: "生成草稿"
                 enabled: Facade.draftStatus !== "GENERATING" && Facade.draftStatus !== "QUEUED"
                 onTriggered: generationDialog.openRequested = true
             }
             MenuItem {
+                objectName: "aiAssistantMenuItem"
                 text: "AI 助手"
                 onTriggered: Facade.toggleAiDrawer(true)
             }

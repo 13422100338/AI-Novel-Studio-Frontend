@@ -21,6 +21,7 @@ import {
   createNovelState,
   createSnapshot,
   replaceAll,
+  selectionText,
   stateToMarkdown,
 } from "./editor-core";
 import { markdownCodec } from "./markdown";
@@ -282,9 +283,7 @@ export class NovelEditor {
 
   getSelectionText(): string {
     const { from, to } = this.view.state.selection;
-    return from === to
-      ? ""
-      : this.view.state.doc.textBetween(from, to, "", "");
+    return selectionText(this.view.state, from, to);
   }
 
   getMarkdown(): string {

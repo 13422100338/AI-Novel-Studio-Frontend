@@ -9,10 +9,10 @@ coming from the page before emitting; JavaScript is never trusted.
 from __future__ import annotations
 
 import json
-from hashlib import sha256 as _sha256
 
 from PySide6.QtCore import QObject, Signal, Slot
 
+from ai_novel_studio.ui_qml.bridge.hash_utils import fnv1a_hash, sha256
 from ai_novel_studio.ui_qml.bridge.models.selection_reference import (
     parse_selection_reference,
 )
@@ -112,20 +112,6 @@ class EditorBridge(QObject):
             )
             return
         self.selection_reference_changed.emit(payload_json)
-
-
-def sha256(text: str) -> str:
-    return _sha256(text.encode("utf-8")).hexdigest()
-
-
-def fnv1a_hash(text: str) -> str:
-    """Reproduce the JS-side FNV-1a fingerprint used by the Phase 1 prototype."""
-    hash_value = 0x811C9DC5
-    for character in text:
-        hash_value ^= ord(character)
-        hash_value = (hash_value * 0x01000193) & 0xFFFFFFFF
-    return f"fnv1a:{hash_value:08x}"
-
 
 def validate_content_hash(markdown: str, content_hash: str) -> bool:
     """Accept the prototype FNV fingerprint or a real SHA-256 hex digest.

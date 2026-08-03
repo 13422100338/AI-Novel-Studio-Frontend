@@ -185,6 +185,21 @@ export interface FindResult {
 }
 
 /**
+ * Text of a selection with block boundaries preserved as newlines.
+ *
+ * ProseMirror's plain `textBetween(from, to, "", "")` concatenates paragraphs,
+ * so a cross-paragraph selection loses its structure. Using "\n" as the block
+ * separator keeps the quoted reference (and its hash) faithful to the editor.
+ */
+export function selectionText(
+  state: EditorState,
+  from: number,
+  to: number,
+): string {
+  return from === to ? "" : state.doc.textBetween(from, to, "\n", "\n");
+}
+
+/**
  * Locate the next occurrence of `needle` at or after `from` in the document
  * text. Returns undefined when absent.
  */

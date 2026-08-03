@@ -24,7 +24,16 @@ ROLE_STATUS = Qt.ItemDataRole.UserRole + 6
 ROLE_OPTIONS = Qt.ItemDataRole.UserRole + 7
 ROLE_CURRENT_TEXT = Qt.ItemDataRole.UserRole + 8
 ROLE_DRAFT_TEXT = Qt.ItemDataRole.UserRole + 9
-ROLE_DATA = Qt.ItemDataRole.UserRole + 10
+ROLE_STATE = Qt.ItemDataRole.UserRole + 10
+ROLE_FIELD_LABELS = Qt.ItemDataRole.UserRole + 11
+ROLE_FIELD_VALUES = Qt.ItemDataRole.UserRole + 12
+ROLE_TARGET = Qt.ItemDataRole.UserRole + 13
+ROLE_OPERATION = Qt.ItemDataRole.UserRole + 14
+ROLE_BEFORE_TEXT = Qt.ItemDataRole.UserRole + 15
+ROLE_AFTER_TEXT = Qt.ItemDataRole.UserRole + 16
+ROLE_RISK = Qt.ItemDataRole.UserRole + 17
+ROLE_REASON = Qt.ItemDataRole.UserRole + 18
+ROLE_DATA = Qt.ItemDataRole.UserRole + 19
 
 _INVALID_INDEX = QModelIndex()
 
@@ -81,6 +90,24 @@ class AgentTimelineModel(QAbstractListModel):
             return item.current_text
         if role == ROLE_DRAFT_TEXT:
             return item.draft_text
+        if role == ROLE_STATE:
+            return item.state
+        if role == ROLE_FIELD_LABELS:
+            return list(item.field_labels)
+        if role == ROLE_FIELD_VALUES:
+            return list(item.field_values)
+        if role == ROLE_TARGET:
+            return item.target
+        if role == ROLE_OPERATION:
+            return item.operation
+        if role == ROLE_BEFORE_TEXT:
+            return item.before_text
+        if role == ROLE_AFTER_TEXT:
+            return item.after_text
+        if role == ROLE_RISK:
+            return item.risk
+        if role == ROLE_REASON:
+            return item.reason
         if role == ROLE_DATA:
             return item.data
         return None
@@ -96,6 +123,15 @@ class AgentTimelineModel(QAbstractListModel):
             ROLE_OPTIONS: QByteArray(b"options"),
             ROLE_CURRENT_TEXT: QByteArray(b"currentText"),
             ROLE_DRAFT_TEXT: QByteArray(b"draftText"),
+            ROLE_STATE: QByteArray(b"state"),
+            ROLE_FIELD_LABELS: QByteArray(b"fieldLabels"),
+            ROLE_FIELD_VALUES: QByteArray(b"fieldValues"),
+            ROLE_TARGET: QByteArray(b"target"),
+            ROLE_OPERATION: QByteArray(b"operation"),
+            ROLE_BEFORE_TEXT: QByteArray(b"beforeText"),
+            ROLE_AFTER_TEXT: QByteArray(b"afterText"),
+            ROLE_RISK: QByteArray(b"risk"),
+            ROLE_REASON: QByteArray(b"reason"),
             ROLE_DATA: QByteArray(b"data"),
         }
 
