@@ -16,6 +16,7 @@ import { history, redo, undo } from "@tiptap/pm/history";
 import {
   DebouncedSaveController,
   SnapshotPayload,
+  buildSelectionReference,
   countWords,
   createNovelState,
   createSnapshot,
@@ -48,8 +49,9 @@ declare const QWebChannel: new (
         markdown: string,
         contentHash: string,
       ): void;
-  selectionChanged(from: number, to: number): void;
-  wordCountChanged(count: number): void;
+      selectionChanged(from: number, to: number): void;
+      wordCountChanged(count: number): void;
+      selectionReferenceChanged(payloadJson: string): void;
     }>;
   }) => void,
 ) => void;
@@ -72,6 +74,7 @@ export interface NovelEditorBridge {
   setReadOnly(reason: string): void;
   revealRange(from: number, to: number): void;
   setBaseRevision(revision: number): void;
+  getSelectionText(): string;
 }
 
 const decorationsKey = new PluginKey<DecorationSet>("auditDecorations");
@@ -128,15 +131,22 @@ export class NovelEditor {
   private baseRevision = 0;
   private readonly onSave: (payload: SnapshotPayload) => void;
   private readonly onWordCount: ((count: number) => void) | null;
+  private readonly onSelectionReference:
+    | ((from: number, to: number) => void)
+    | null;
+  private lastSelectionFrom = -1;
+  private lastSelectionTo = -1;
 
   constructor(
     mount: HTMLElement,
     onSave: (payload: SnapshotPayload) => void,
     onWordCount: ((count: number) => void) | null = null,
+    onSelectionReference: ((from: number, to: number) => void) | null = null,
     initial: LoadDocumentPayload | null = null,
   ) {
     this.onSave = onSave;
     this.onWordCount = onWordCount;
+    this.onSelectionReference = onSelectionReference;
     this.saveController = new DebouncedSaveController({
       onSave: (payload) => this.onSave(payload),
     });
@@ -158,6 +168,7 @@ export class NovelEditor {
         this.view.updateState(next);
         this.scheduleSave();
         this.reportWordCount();
+        this.reportSelection();
       },
     });
     thisRef.view = this.view;
@@ -176,11 +187,26 @@ export class NovelEditor {
     }
   }
 
+  private reportSelection(): void {
+    const { from, to } = this.view.state.selection;
+    if (from === this.lastSelectionFrom && to === this.lastSelectionTo) {
+      return;
+    }
+    this.lastSelectionFrom = from;
+    this.lastSelectionTo = to;
+    if (this.onSelectionReference) {
+      this.onSelectionReference(from, to);
+    }
+  }
+
   loadDocument(payload: LoadDocumentPayload): void {
     this.chapterId = payload.chapterId;
     this.baseRevision = payload.baseRevision;
+    this.lastSelectionFrom = -1;
+    this.lastSelectionTo = -1;
     const next = createEditorState(payload.markdown);
     this.view.updateState(next);
+    this.reportSelection();
     this.saveController.flush(
       createSnapshot(this.view.state, this.chapterId, this.baseRevision),
     );
@@ -254,8 +280,23 @@ export class NovelEditor {
     this.baseRevision = revision;
   }
 
+  getSelectionText(): string {
+    const { from, to } = this.view.state.selection;
+    return from === to
+      ? ""
+      : this.view.state.doc.textBetween(from, to, "", "");
+  }
+
   getMarkdown(): string {
     return stateToMarkdown(this.view.state);
+  }
+
+  getChapterId(): string {
+    return this.chapterId;
+  }
+
+  getBaseRevision(): number {
+    return this.baseRevision;
   }
 
   destroy(): void {
@@ -278,6 +319,7 @@ export function boot(
       contentHash: string,
     ): void;
     wordCountChanged(count: number): void;
+    selectionReferenceChanged(payloadJson: string): void;
   } | null = null;
   const editor = new NovelEditor(
     mount,
@@ -300,6 +342,20 @@ export function boot(
         onWordCount(count);
       }
     },
+    (from, to) => {
+      const text = from === to ? "" : editor.getSelectionText();
+      const payload = buildSelectionReference(
+        editor.getChapterId(),
+        editor.getBaseRevision(),
+        from,
+        to,
+        text,
+      );
+      const json = payload === null ? "" : JSON.stringify(payload);
+      if (pythonBridge) {
+        pythonBridge.selectionReferenceChanged(json);
+      }
+    },
     initial,
   );
   const bridge: NovelEditorBridge = {
@@ -315,6 +371,7 @@ export function boot(
     setReadOnly: (reason) => editor.setReadOnly(reason),
     revealRange: (from, to) => editor.revealRange(from, to),
     setBaseRevision: (revision) => editor.setBaseRevision(revision),
+    getSelectionText: () => editor.getSelectionText(),
   };
   window.__novelEditor = bridge;
   if (window.qt && window.qt.webChannelTransport) {

@@ -1,16 +1,18 @@
 ﻿"""Frontend Wave F2/F3: real-project wiring through the facade."""
 
 from __future__ import annotations
+
 import pytest
+
 pytest.importorskip("ai_novel_studio.application")
 
 from pathlib import Path
 
-from PySide6.QtCore import QUrl
-
 from ai_novel_studio.application.project_workspace_service import ProjectWorkspaceService
 from ai_novel_studio.infrastructure.storage.chapter_repository import ChapterRepository
 from ai_novel_studio.infrastructure.storage.project_repository import ProjectRepository
+from PySide6.QtCore import QUrl
+
 from ai_novel_studio.ui_qml.bridge.mock_novel_studio_facade import MockNovelStudioFacade
 
 

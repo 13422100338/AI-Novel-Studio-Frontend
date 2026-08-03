@@ -1,11 +1,10 @@
-import pytest
-pytest.importorskip("ai_novel_studio.application")
-
 import threading
+from types import SimpleNamespace
 
+import pytest
 from PySide6.QtCore import QObject
 
-from ai_novel_studio.application.project_generation_session import AcceptedGeneration
+from ai_novel_studio.ui_qml.bridge.backend_availability import BACKEND_AVAILABLE
 from ai_novel_studio.ui_qml.bridge.draft_port import GenerationConfig
 from ai_novel_studio.ui_qml.bridge.dtos import UsageDto
 from ai_novel_studio.ui_qml.bridge.mock_novel_studio_facade import MockNovelStudioFacade
@@ -15,7 +14,14 @@ from ai_novel_studio.ui_qml.bridge.models.draft_diff_model import (
 )
 from ai_novel_studio.ui_qml.bridge.models.suggestion_list_model import ROLE_LABEL
 
-from .test_project_wiring import create_temp_project
+
+def create_temp_project(root):
+    """Real-project fixture; skipped when the backend is absent."""
+    if not BACKEND_AVAILABLE:
+        pytest.skip("needs backend project workspace")
+    from .test_project_wiring import create_temp_project as _real
+
+    return _real(root)
 
 
 class FakeDraftPort:
@@ -74,11 +80,11 @@ class FakeDraftPort:
     def usage_snapshot(self) -> UsageDto:
         return self.usage
 
-    def accept_current(self) -> AcceptedGeneration:
+    def accept_current(self) -> SimpleNamespace:
         if self.accept_failure is not None:
             raise RuntimeError(self.accept_failure)
         self.accepted = True
-        return AcceptedGeneration(self.draft_text, self.next_revision)
+        return SimpleNamespace(text=self.draft_text, chapter_revision=self.next_revision)
 
     def discard_current(self) -> bool:
         self.discarded = True
@@ -181,9 +187,9 @@ def test_drawer_toggle() -> None:
 def test_active_nav_validation() -> None:
     facade = MockNovelStudioFacade()
     facade.setActiveNav("memory")
-    assert facade.property("activeNav") == "memory"
+    assert facade.property("activeNav") == "library"
     facade.setActiveNav("unknown")
-    assert facade.property("activeNav") == "memory"
+    assert facade.property("activeNav") == "library"
 
 
 def test_reduce_motion_toggle() -> None:
@@ -382,8 +388,8 @@ def test_project_draft_forwards_generation_config(qtbot, tmp_path) -> None:
     _, revision, config = port.prepared[0]
     assert revision == facade.property("currentRevision")
     assert config.target_words == 3000
-    assert config.mode.value == "STANDARD"
-    assert config.audit_policy.value == "STANDARD"
+    assert config.mode == "STANDARD"
+    assert config.audit_policy == "STANDARD"
     assert config.output_token_limit == 8192
 
 

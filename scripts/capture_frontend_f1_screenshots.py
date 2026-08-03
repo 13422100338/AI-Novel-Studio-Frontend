@@ -1,8 +1,10 @@
-"""Capture Frontend Wave F1 screenshots (offscreen, software rendering).
+"""Capture Frontend Wave F1/C1 screenshots (offscreen, software rendering).
 
 Usage (from the worktree root, using its venv):
     .\\.venv\\Scripts\\python.exe scripts\\capture_frontend_f1_screenshots.py
 
+TextArea mode is used (WebEngine cannot initialize offscreen); C1 captures the
+converged shell, Agent timeline, TextDiffCard, and selection-reference chip.
 Outputs PNGs into docs/frontend/screenshots/.
 """
 
@@ -47,13 +49,39 @@ def main() -> int:
     out_dir = Path(__file__).resolve().parent.parent / "docs" / "frontend" / "screenshots"
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # C1: converged default writing shell per theme.
     for theme_name in ("paper", "light", "dark"):
         theme.setTheme(theme_name)
         _pump(app)
-        target = out_dir / f"01-shell-{theme_name}.png"
+        target = out_dir / f"c1-shell-{theme_name}.png"
         saved = window.grabWindow().save(str(target))
         print(f"{'OK  ' if saved else 'FAIL'} {target.name}")
 
+    theme.setTheme("paper")
+    # C1: Agent panel expanded with a Mock timeline containing a TextDiffCard.
+    facade.toggleAiDrawer(True)
+    _pump(app)
+    facade.startAgentTurn("帮我重写这段，让人物说话更自然。")
+    for _ in range(40):
+        app.processEvents()
+    _pump(app)
+    target = out_dir / "c1-agent-panel-textdiff.png"
+    saved = window.grabWindow().save(str(target))
+    print(f"{'OK  ' if saved else 'FAIL'} {target.name}")
+
+    # C1: selection reference chip in the composer.
+    facade.setSelectionReferenceJson(
+        '{"chapterId":"chapter-1","baseRevision":1,"from":0,"to":6,'
+        '"selectedText":"清晨的雾港","selectedTextHash":"fnv1a:00000000"}'
+    )
+    _pump(app)
+    target = out_dir / "c1-selection-reference-chip.png"
+    saved = window.grabWindow().save(str(target))
+    print(f"{'OK  ' if saved else 'FAIL'} {target.name}")
+
+    # Legacy captures kept for the original suite.
+    facade.toggleAiDrawer(False)
+    facade.clearSelectionReference()
     facade.requestDraft()
     theme.setTheme("paper")
     _pump(app)

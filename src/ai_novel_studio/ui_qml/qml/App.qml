@@ -24,10 +24,8 @@ ApplicationWindow {
     function navTitle(navId) {
         const map = {
             "writing": "写作",
-            "characters": "人物",
-            "memory": "记忆",
-            "clues": "线索",
-            "audit": "审校",
+            "library": "记忆库",
+            "advanced": "高级创作",
             "settings": "设置"
         }
         return map[navId] || "写作"
@@ -36,11 +34,9 @@ ApplicationWindow {
     function navIndex(navId) {
         const map = {
             "writing": 0,
-            "characters": 1,
-            "memory": 2,
-            "clues": 3,
-            "audit": 4,
-            "settings": 5
+            "library": 1,
+            "advanced": 2,
+            "settings": 3
         }
         return map[navId] || 0
     }
@@ -113,27 +109,18 @@ ApplicationWindow {
                         useWebEngine: window.useWebEngine
                     }
 
-                    CharactersPage {}
+                    MemoryLibraryPage {}
 
-                    MemoryPage {}
+                    AdvancedCreationPage {}
 
-                    EmptyState {
-                        title: "页面迁移中"
-                        body: "「线索」工作区将在后续 Wave 接入现有服务。"
-                    }
-
-                    AuditPage {}
-
-                    EmptyState {
-                        title: "设置"
-                        body: "设置工作区将在后续 Wave 接入现有模型与外观配置。"
-                    }
+                    SettingsPage {}
                 }
             }
 
-            DockableAiDrawer {
+            AgentDock {
                 visible: window.useWebEngine
                 open: Facade.aiDrawerOpen
+                windowWidth: window.width
                 onClosed: Facade.toggleAiDrawer(false)
             }
 
@@ -181,43 +168,46 @@ ApplicationWindow {
                     value: "Mock"
                     tone: "accent"
                 }
-                StatusChip {
-                    objectName: "usageTokensChip"
-                    label: "Token"
-                    value: Facade.usageInputOutputText
-                    tooltipText: "输入 / 输出 · " + Facade.usageCallsText
-                }
-                StatusChip {
-                    objectName: "usageCostChip"
-                    label: "费用"
-                    value: Facade.usageCostText
-                    tone: "accent"
-                }
-                StatusChip {
-                    objectName: "usageCacheChip"
-                    label: ""
-                    value: Facade.usageCacheText
-                }
-                StatusChip {
-                    label: "数据源"
-                    value: Facade.projectSource === "project" ? "项目" : "演示"
-                    tone: Facade.projectSource === "project" ? "accent" : "neutral"
-                }
-
                 Item {
                     Layout.fillWidth: true
                 }
 
                 AppButton {
-                    objectName: "motionButton"
-                    text: Facade.reduceMotion ? "动效：关" : "动效：开"
-                    onClicked: Facade.setReduceMotion(!Facade.reduceMotion)
+                    objectName: "statusMoreButton"
+                    text: "···"
+                    onClicked: moreMenu.popup()
                 }
-                AppButton {
-                    objectName: "themeButton"
-                    text: "主题：" + Theme.themeName
-                    onClicked: Theme.setTheme(Theme.nextThemeName())
-                }
+            }
+        }
+
+        Menu {
+            id: moreMenu
+            objectName: "statusMoreMenu"
+
+            MenuItem {
+                text: "主题：" + Theme.themeName
+                onTriggered: Theme.setTheme(Theme.nextThemeName())
+            }
+            MenuItem {
+                text: Facade.reduceMotion ? "动效：开" : "动效：关"
+                onTriggered: Facade.setReduceMotion(!Facade.reduceMotion)
+            }
+            MenuSeparator {}
+            MenuItem {
+                text: "Token：" + Facade.usageInputOutputText
+                enabled: false
+            }
+            MenuItem {
+                text: "费用：" + Facade.usageCostText
+                enabled: false
+            }
+            MenuItem {
+                text: "缓存：" + Facade.usageCacheText
+                enabled: false
+            }
+            MenuItem {
+                text: "数据源：" + (Facade.projectSource === "project" ? "项目" : "演示")
+                enabled: false
             }
         }
     }

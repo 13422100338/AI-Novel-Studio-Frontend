@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 from ai_novel_studio.ui_qml.bridge.dtos import UsageDto
 
@@ -57,7 +57,7 @@ class DraftPort(Protocol):
 
     def usage_snapshot(self) -> UsageDto: ...
 
-    def accept_current(self) -> AcceptedGeneration: ...
+    def accept_current(self) -> Any: ...
 
     def discard_current(self) -> bool: ...
 
@@ -65,7 +65,7 @@ class DraftPort(Protocol):
 class ProjectSessionDraftPort:
     """Production draft port backed by the framework-neutral generation session."""
 
-    def __init__(self, session: ProjectGenerationSession) -> None:
+    def __init__(self, session: Any) -> None:
         self.session = session
 
     def prepare(
@@ -77,12 +77,13 @@ class ProjectSessionDraftPort:
         from ai_novel_studio.domain.generation import AuditPolicy, CreationMode
 
         self.session.select_chapter(chapter_id, revision)
-        return self.session.prepare_generation(
+        run_id = self.session.prepare_generation(
             CreationMode(config.mode),
             config.output_token_limit,
             config.target_words,
             AuditPolicy(config.audit_policy),
         )
+        return str(run_id)
 
     def generate(self, run_id: str) -> tuple[str, str]:
         """Consume the prose stream to completion and return (draft, error)."""
@@ -131,8 +132,8 @@ class ProjectSessionDraftPort:
             cache_known=snapshot.cache_known,
         )
 
-    def accept_current(self) -> AcceptedGeneration:
+    def accept_current(self) -> Any:
         return self.session.accept_current()
 
     def discard_current(self) -> bool:
-        return self.session.discard_current()
+        return bool(self.session.discard_current())

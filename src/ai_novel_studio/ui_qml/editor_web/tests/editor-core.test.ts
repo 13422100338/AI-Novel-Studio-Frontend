@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  buildSelectionReference,
   DebouncedSaveController,
   createNovelState,
   createSnapshot,
@@ -118,5 +119,30 @@ describe("debounced save controller", () => {
     expect(observer).toHaveBeenCalledTimes(1);
     controller.destroy();
     vi.useRealTimers();
+  });
+});
+
+describe("selection reference (C1)", () => {
+  it("builds a payload with hash for a non-empty selection", () => {
+    const payload = buildSelectionReference("c1", 3, 10, 14, "雾港的清晨");
+    expect(payload).not.toBeNull();
+    expect(payload?.chapterId).toBe("c1");
+    expect(payload?.baseRevision).toBe(3);
+    expect(payload?.from).toBe(10);
+    expect(payload?.to).toBe(14);
+    expect(payload?.selectedText).toBe("雾港的清晨");
+    expect(payload?.selectedTextHash).toMatch(/^fnv1a:/);
+  });
+
+  it("returns null for empty selection and out-of-range positions", () => {
+    expect(buildSelectionReference("c1", 1, 5, 5, "")).toBeNull();
+    expect(buildSelectionReference("", 1, 0, 1, "x")).toBeNull();
+    expect(buildSelectionReference("c1", -1, 0, 1, "x")).toBeNull();
+    expect(buildSelectionReference("c1", 1, 5, 4, "x")).toBeNull();
+  });
+
+  it("caps oversized selections", () => {
+    const huge = "字".repeat(30_000);
+    expect(buildSelectionReference("c1", 1, 0, 30_000, huge)).toBeNull();
   });
 });

@@ -77,6 +77,27 @@ ProjectGenerationSession(project, gateway, history)
 - 校验：协议版本 == 1；能力白名单 `{markdown-v1, selection-v1, decorations-v1}`；
   保存 payload ≤ 5MB；哈希接受 `fnv1a:` 指纹（Phase 1 原型）或真实 SHA-256
 
+### 4.1 选区引用协议（C1）
+
+- JS → Python：`pythonBridge.selectionReferenceChanged(payloadJson)`，
+  payload 含 `chapterId / baseRevision / from / to / selectedText /
+  selectedTextHash`；空串表示清空（空选区/切章）；
+- Python 校验：章节 ID 非空、修订号非负、`from <= to`、位置非负、
+  文本非空且 ≤ 20_000 字符、哈希为 `fnv1a:`（8 hex）或 64 hex；
+- Facade：`hasSelectionReference`、`selectionReferenceLabel`、
+  `selectionReferencePreview`、`clearSelectionReference()`；切章自动清空；
+- 下行替换协议（`applyConfirmedReplacement`）属 C4，本轮未实现。
+
+### 4.2 Agent 时间线（C1）
+
+- `AgentTimelineItemDto(kind, text, label, busy, status, options,
+  current_text, draft_text, data)`，kind ∈ {user_text, assistant_text,
+  run_status, tool_call, tool_result, choice_card, text_diff, confirmation,
+  warning, error}；
+- `Facade.startAgentTurn(text)` / `stopAgentTurn()` / `agentReplyChoice(i)` /
+  `approveAgentChangeSet()` / `discardAgentChangeSet()`；
+- 真实后端按文档第 8 节演进为 `CreativeAgentPort`（C2+）。
+
 ## 5. 当前未接线点（前端已留 UI/占位）
 
 - `sendDiscussion(text)`：剧情商讨为确定性 Mock 回复；后端应接

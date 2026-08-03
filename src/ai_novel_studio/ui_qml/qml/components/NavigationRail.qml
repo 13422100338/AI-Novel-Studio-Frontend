@@ -25,11 +25,8 @@ Item {
 
         Repeater {
             model: [
-                { id: "writing", icon: "\u270E", label: "写作" },
-                { id: "characters", icon: "\u25C9", label: "人物" },
-                { id: "memory", icon: "\u25A4", label: "记忆" },
-                { id: "clues", icon: "\u2321", label: "线索" },
-                { id: "audit", icon: "\u2713", label: "审校" },
+                { id: "library", icon: "\u25A4", label: "记忆库" },
+                { id: "advanced", icon: "\u2726", label: "高级创作" },
                 { id: "settings", icon: "\u2699", label: "设置" }
             ]
             delegate: IconButton {

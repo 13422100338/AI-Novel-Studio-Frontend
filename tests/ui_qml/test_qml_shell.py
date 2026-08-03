@@ -1,6 +1,3 @@
-import pytest
-pytest.importorskip("ai_novel_studio.application")
-
 from pathlib import Path
 
 from PySide6.QtCore import QMetaObject, QUrl
@@ -9,6 +6,7 @@ from PySide6.QtQuick import QQuickItem
 from pytestqt.qtbot import QtBot
 
 from ai_novel_studio.ui_qml.bootstrap import app_qml_path, register_frontend_types
+from ai_novel_studio.ui_qml.bridge.backend_availability import BACKEND_AVAILABLE
 from ai_novel_studio.ui_qml.bridge.mock_novel_studio_facade import MockNovelStudioFacade
 from ai_novel_studio.ui_qml.bridge.theme_provider import ThemeProvider
 
@@ -17,6 +15,10 @@ from .test_mock_facade import FakeDraftPort
 
 def _create_temp_project(root: Path) -> Path:
     """Minimal real-project fixture (mirrors test_project_wiring)."""
+    if not BACKEND_AVAILABLE:
+        import pytest
+
+        pytest.skip("needs backend project workspace")
     from ai_novel_studio.application.project_workspace_service import (
         ProjectWorkspaceService,
     )
@@ -85,8 +87,8 @@ def test_shell_loads_and_exposes_core_objects(qtbot: QtBot) -> None:
         "chapterList",
         "sidebarSearch",
         "aiDrawer",
-        "themeButton",
-        "motionButton",
+        "chapterMenuButton",
+        "statusMoreButton",
     ):
         assert window.findChild(object, name) is not None, f"missing {name}"
 
@@ -157,10 +159,10 @@ def test_sidebar_toggle_toggles_state_and_label(qtbot: QtBot) -> None:
 def test_navigation_rail_button_switches_page(qtbot: QtBot) -> None:
     engine, facade, _ = _load_engine(qtbot)
     window = engine.rootObjects()[0]
-    memory_button = _find_quick_item(window.contentItem(), "nav-memory")
-    assert memory_button is not None
-    QMetaObject.invokeMethod(memory_button, "clicked")
-    assert facade.property("activeNav") == "memory"
+    library_button = _find_quick_item(window.contentItem(), "nav-library")
+    assert library_button is not None
+    QMetaObject.invokeMethod(library_button, "clicked")
+    assert facade.property("activeNav") == "library"
 
 
 def test_sidebar_search_filters_chapter_list(qtbot: QtBot) -> None:
@@ -175,30 +177,21 @@ def test_sidebar_search_filters_chapter_list(qtbot: QtBot) -> None:
     assert model.rowCount() == 7
 
 
-def test_theme_button_cycles_theme(qtbot: QtBot) -> None:
+def test_theme_cycles_via_provider_and_more_menu(qtbot: QtBot) -> None:
     engine, _, theme = _load_engine(qtbot)
     window = engine.rootObjects()[0]
-    theme_button = window.findChild(object, "themeButton")
+    more_button = window.findChild(object, "statusMoreButton")
+    assert more_button is not None
     assert theme.property("themeName") == "paper"
-    QMetaObject.invokeMethod(theme_button, "clicked")
+    theme.setTheme(theme.nextThemeName())
     assert theme.property("themeName") == "light"
-    QMetaObject.invokeMethod(theme_button, "clicked")
+    theme.setTheme(theme.nextThemeName())
     assert theme.property("themeName") == "dark"
 
 
 def test_draft_button_opens_drawer(qtbot: QtBot) -> None:
     engine, facade, _ = _load_engine(qtbot)
-    window = engine.rootObjects()[0]
-    draft_button = window.findChild(object, "draftButton")
-    start_button = window.findChild(object, "startGenerationButton")
-    assert draft_button is not None
-    assert start_button is not None
-
-    QMetaObject.invokeMethod(draft_button, "clicked")
-    dialog = window.findChild(object, "generationConfigDialog")
-    assert dialog is not None
-    qtbot.waitUntil(lambda: dialog.property("visible") is True, timeout=5000)
-    QMetaObject.invokeMethod(start_button, "clicked")
+    facade.requestDraft()
 
     assert facade.property("aiDrawerOpen") is True
     assert facade.property("suggestions").rowCount() == 1
@@ -223,6 +216,9 @@ def test_project_controls_exist_in_sidebar(qtbot: QtBot) -> None:
 
 
 def test_real_project_loads_into_editor(qtbot: QtBot, tmp_path: Path) -> None:
+    if not BACKEND_AVAILABLE:
+        import pytest
+        pytest.skip("needs backend")
     root = _create_temp_project(tmp_path / "novel")
     engine, facade, _ = _load_engine(qtbot)
     window = engine.rootObjects()[0]
@@ -236,6 +232,9 @@ def test_real_project_loads_into_editor(qtbot: QtBot, tmp_path: Path) -> None:
 
 
 def test_reset_demo_restores_mock_editor(qtbot: QtBot, tmp_path: Path) -> None:
+    if not BACKEND_AVAILABLE:
+        import pytest
+        pytest.skip("needs backend")
     root = _create_temp_project(tmp_path / "novel")
     engine, facade, _ = _load_engine(qtbot)
     window = engine.rootObjects()[0]
@@ -251,6 +250,9 @@ def test_reset_demo_restores_mock_editor(qtbot: QtBot, tmp_path: Path) -> None:
 def test_save_conflict_shows_reload_button_and_recovers(
     qtbot: QtBot, tmp_path: Path
 ) -> None:
+    if not BACKEND_AVAILABLE:
+        import pytest
+        pytest.skip("needs backend")
     from ai_novel_studio.infrastructure.storage.chapter_repository import (
         ChapterRepository,
     )
@@ -331,10 +333,9 @@ def test_generation_config_dialog_applies_values_before_start(
     window = engine.rootObjects()[0]
     dialog = window.findChild(object, "generationConfigDialog")
     assert dialog is not None
-    draft_button = window.findChild(object, "draftButton")
     start_button = window.findChild(object, "startGenerationButton")
 
-    QMetaObject.invokeMethod(draft_button, "clicked")
+    dialog.setProperty("openRequested", True)
     qtbot.waitUntil(lambda: dialog.property("visible") is True, timeout=5000)
 
     target_spin = dialog.findChild(object, "targetWordsSpin")
@@ -389,6 +390,9 @@ def test_usage_chips_visible_and_update_after_generation(
 
 
 def test_overview_pages_exist_and_show_counts(qtbot: QtBot, tmp_path: Path) -> None:
+    if not BACKEND_AVAILABLE:
+        import pytest
+        pytest.skip("needs backend")
     root = _create_temp_project(tmp_path / "novel")
     facade = MockNovelStudioFacade()
     facade.openProject(str(root))
@@ -399,7 +403,7 @@ def test_overview_pages_exist_and_show_counts(qtbot: QtBot, tmp_path: Path) -> N
         assert window.findChild(object, page) is not None, f"missing {page}"
 
     facade.setActiveNav("characters")
-    assert facade.property("activeNav") == "characters"
+    assert facade.property("activeNav") == "library"
     characters_page = window.findChild(object, "charactersPage")
     assert characters_page.property("visible") is True
     count_chip = window.findChild(object, "charactersPageCount")
@@ -410,6 +414,9 @@ def test_overview_pages_exist_and_show_counts(qtbot: QtBot, tmp_path: Path) -> N
 def test_readonly_lists_exist_and_show_empty_state(
     qtbot: QtBot, tmp_path: Path
 ) -> None:
+    if not BACKEND_AVAILABLE:
+        import pytest
+        pytest.skip("needs backend")
     root = _create_temp_project(tmp_path / "novel")
     facade = MockNovelStudioFacade()
     facade.openProject(str(root))
@@ -429,6 +436,9 @@ def test_readonly_lists_exist_and_show_empty_state(
 def test_character_detail_panel_shows_after_selection(
     qtbot: QtBot, tmp_path: Path
 ) -> None:
+    if not BACKEND_AVAILABLE:
+        import pytest
+        pytest.skip("needs backend")
     from .test_readonly_views import create_project_with_character
 
     root, _ = create_project_with_character(tmp_path)
@@ -441,6 +451,7 @@ def test_character_detail_panel_shows_after_selection(
     assert detail is not None
 
     facade.setActiveNav("characters")
+    assert facade.property("activeNav") == "library"
     facade.selectCharacter(0)
 
     assert facade.property("characterDetailVisible") is True
@@ -460,6 +471,9 @@ def test_character_detail_panel_shows_after_selection(
 def test_audit_evidence_reveal_selects_text_in_editor(
     qtbot: QtBot, tmp_path: Path
 ) -> None:
+    if not BACKEND_AVAILABLE:
+        import pytest
+        pytest.skip("needs backend")
     from .test_readonly_views import create_project_with_audit
 
     root = create_project_with_audit(tmp_path)
@@ -482,6 +496,9 @@ def test_audit_evidence_reveal_selects_text_in_editor(
 def test_memory_detail_panel_shows_after_selection(
     qtbot: QtBot, tmp_path: Path
 ) -> None:
+    if not BACKEND_AVAILABLE:
+        import pytest
+        pytest.skip("needs backend")
     from .test_readonly_views import create_project_with_memory
 
     root = create_project_with_memory(tmp_path)
@@ -511,6 +528,9 @@ def test_memory_detail_panel_shows_after_selection(
 def test_audit_ignore_button_updates_finding_status(
     qtbot: QtBot, tmp_path: Path
 ) -> None:
+    if not BACKEND_AVAILABLE:
+        import pytest
+        pytest.skip("needs backend")
     from .test_readonly_views import create_project_with_audit
 
     root = create_project_with_audit(tmp_path)

@@ -1,6 +1,3 @@
-import pytest
-pytest.importorskip("ai_novel_studio.application")
-
 """Phase 1: editor bridge payload validation."""
 
 from pathlib import Path
@@ -12,8 +9,6 @@ from ai_novel_studio.ui_qml.bridge.editor_bridge import (
     validate_content_hash,
 )
 from ai_novel_studio.ui_qml.bridge.mock_novel_studio_facade import MockNovelStudioFacade
-
-from .test_project_wiring import create_temp_project
 
 
 def test_editor_ready_accepts_valid_protocol() -> None:
@@ -118,6 +113,14 @@ def test_word_count_changed_forwards_positive_counts() -> None:
 
 
 def test_bridge_save_flows_into_facade_persistence(tmp_path: Path) -> None:
+    from ai_novel_studio.ui_qml.bridge.backend_availability import BACKEND_AVAILABLE
+
+    if not BACKEND_AVAILABLE:
+        import pytest
+
+        pytest.skip("needs backend project workspace")
+    from .test_project_wiring import create_temp_project
+
     root = create_temp_project(tmp_path / "novel")
     facade = MockNovelStudioFacade()
     facade.openProject(str(root))
@@ -147,6 +150,14 @@ def test_validate_content_hash_accepts_fnv_and_sha256() -> None:
 
 
 def test_bridge_accepts_fnv_fingerprint_save(tmp_path: Path) -> None:
+    from ai_novel_studio.ui_qml.bridge.backend_availability import BACKEND_AVAILABLE
+
+    if not BACKEND_AVAILABLE:
+        import pytest
+
+        pytest.skip("needs backend project workspace")
+    from .test_project_wiring import create_temp_project
+
     root = create_temp_project(tmp_path / "novel")
     facade = MockNovelStudioFacade()
     facade.openProject(str(root))

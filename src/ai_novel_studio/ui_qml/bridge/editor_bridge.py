@@ -13,6 +13,10 @@ from hashlib import sha256 as _sha256
 
 from PySide6.QtCore import QObject, Signal, Slot
 
+from ai_novel_studio.ui_qml.bridge.models.selection_reference import (
+    parse_selection_reference,
+)
+
 _PROTOCOL_VERSION = 1
 _ALLOWED_CAPABILITIES = {"markdown-v1", "selection-v1", "decorations-v1"}
 
@@ -24,6 +28,7 @@ class EditorBridge(QObject):
     save_requested = Signal(str, int, str, str)
     selection_changed = Signal(int, int)
     word_count_changed = Signal(int)
+    selection_reference_changed = Signal(str)
     error = Signal(str, str)
 
     def __init__(self, parent: QObject | None = None) -> None:
@@ -91,6 +96,22 @@ class EditorBridge(QObject):
         if count < 0:
             return
         self.word_count_changed.emit(count)
+
+    @Slot(str)
+    def selectionReferenceChanged(self, payload_json: str) -> None:
+        """Receive a validated-or-empty selection reference JSON from the editor."""
+        reference = parse_selection_reference(payload_json)
+        if reference is None:
+            # Empty string is the explicit "no selection / chapter switched" signal.
+            if payload_json.strip() == "":
+                self.selection_reference_changed.emit("")
+                return
+            self.error.emit(
+                "INVALID_SELECTION_REFERENCE",
+                "选区引用数据无效，已忽略",
+            )
+            return
+        self.selection_reference_changed.emit(payload_json)
 
 
 def sha256(text: str) -> str:

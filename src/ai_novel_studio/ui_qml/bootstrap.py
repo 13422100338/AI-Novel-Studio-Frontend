@@ -95,6 +95,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         editor_bridge.error.connect(facade.setSaveStatusText)
         editor_bridge.word_count_changed.connect(facade.setWebEngineWordCount)
+        editor_bridge.selection_reference_changed.connect(
+            facade.setSelectionReferenceJson
+        )
         engine.rootContext().setContextProperty("pythonBridge", editor_bridge)
         dist = ensure_editor_dist()
         engine.rootContext().setContextProperty(

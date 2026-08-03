@@ -59,3 +59,32 @@ class DiscussionMessageDto:
     id: str
     role: str  # user | assistant
     text: str
+
+
+@dataclass(frozen=True, slots=True)
+class AgentTimelineItemDto:
+    """One structured Agent timeline event (C1)."""
+
+    id: str
+    kind: str  # user_text|assistant_text|run_status|tool_call|tool_result|
+    # choice_card|text_diff|confirmation|warning|error
+    text: str = ""
+    label: str = ""
+    busy: bool = False
+    status: str = ""
+    options: tuple[str, ...] = ()
+    current_text: str = ""
+    draft_text: str = ""
+    data: str = ""  # JSON-safe extra payload string
+
+
+@dataclass(frozen=True, slots=True)
+class SelectionReferenceDto:
+    """Validated selection reference from the WebEngine editor (C1)."""
+
+    chapter_id: str
+    base_revision: int
+    from_pos: int
+    to_pos: int
+    selected_text: str
+    selected_text_hash: str

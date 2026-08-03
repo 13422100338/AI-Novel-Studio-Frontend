@@ -48,9 +48,9 @@ class MemoryViewDto:
     title: str
     content: str = ""
     source_type: str = ""
-    authority: Authority | str = ""
-    review_status: ReviewStatus | str = ""
-    status: MemoryStatus | str = ""
+    authority: str = ""
+    review_status: str = ""
+    status: str = ""
     revision: int = 0
 
 

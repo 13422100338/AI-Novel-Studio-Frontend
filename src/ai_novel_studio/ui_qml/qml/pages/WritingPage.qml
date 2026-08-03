@@ -42,72 +42,33 @@ Item {
                 }
             }
 
+            AppButton {
+                objectName: "chapterMenuButton"
+                text: "···"
+                onClicked: chapterMenu.popup()
+            }
         }
 
-        Flow {
-            id: actionRow
-            Layout.fillWidth: true
-            spacing: 8
+        Menu {
+            id: chapterMenu
+            objectName: "chapterMenu"
 
-            StatusChip {
-                label: "修订"
-                value: String(Facade.currentRevision)
+            MenuItem {
+                text: "修订 " + Facade.currentRevision
+                enabled: false
             }
-            AppButton {
-                objectName: "webSaveButton"
-                text: "保存"
-                primary: true
-                visible: root.useWebEngine
-                onClicked: {
-                    if (webEditorLoader.item !== null) {
-                        webEditorLoader.item.requestSave()
-                    }
-                }
+            MenuItem {
+                text: "章节信息"
+                onTriggered: Facade.setSaveStatusText("章节信息面板将在后续 Wave 接线。")
             }
-            AppButton {
-                objectName: "saveButton"
-                text: "保存"
-                primary: true
-                visible: !root.useWebEngine
-                onClicked: Facade.requestSave()
-            }
-            AppButton {
-                objectName: "draftButton"
+            MenuItem {
                 text: "生成草稿"
                 enabled: Facade.draftStatus !== "GENERATING" && Facade.draftStatus !== "QUEUED"
-                onClicked: generationDialog.openRequested = true
+                onTriggered: generationDialog.openRequested = true
             }
-            AppButton {
-                objectName: "cancelDraftButton"
-                text: "取消生成"
-                visible: Facade.draftStatus === "GENERATING" || Facade.draftStatus === "QUEUED"
-                onClicked: Facade.cancelDraft()
-            }
-            AppButton {
-                text: "AI 参考"
-                primary: true
-                onClicked: Facade.toggleAiDrawer(true)
-            }
-            AppButton {
-                text: "章节信息"
-                onClicked: infoText.text = "章节信息面板将在后续 Wave 接线。"
-            }
-        }
-
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 8
-
-            Text {
-                id: infoText
-                Layout.fillWidth: true
-                text: root.useWebEngine
-                    ? "WebEngine 编辑器：编辑正文并保存；「生成草稿」将草稿送入 AI 参考抽屉，整章采用后写回编辑器。"
-                    : "F1 Mock 工作区：编辑正文并保存；「生成草稿」会创建一条 AI 建议（候选层，不直接改正文）。"
-                font.pixelSize: 11
-                wrapMode: Text.WordWrap
-                elide: Text.ElideRight
-                color: Theme.tokens.color.textSecondary
+            MenuItem {
+                text: "AI 助手"
+                onTriggered: Facade.toggleAiDrawer(true)
             }
         }
 
@@ -205,6 +166,10 @@ Item {
                 tone: root.stateTone(Facade.editorState)
             }
             StatusChip {
+                label: "修订"
+                value: String(Facade.currentRevision)
+            }
+            StatusChip {
                 label: ""
                 value: Facade.saveStatusText
                 visible: Facade.editorState !== "CLEAN"
@@ -221,7 +186,7 @@ Item {
                 onClicked: Facade.reloadChapter()
             }
             AppButton {
-                objectName: "bottomSaveButton"
+                objectName: "saveButton"
                 text: "保存"
                 primary: true
                 onClicked: {
@@ -233,6 +198,12 @@ Item {
                         Facade.requestSave()
                     }
                 }
+            }
+            AppButton {
+                objectName: "cancelDraftButton"
+                text: "取消生成"
+                visible: Facade.draftStatus === "GENERATING" || Facade.draftStatus === "QUEUED"
+                onClicked: Facade.cancelDraft()
             }
         }
     }

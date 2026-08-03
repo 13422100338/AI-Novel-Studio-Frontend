@@ -13,23 +13,29 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
-from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
+from PySide6.QtCore import Property, QObject, QTimer, QUrl, Signal, Slot
 
+from ai_novel_studio.ui_qml.bridge.backend_availability import BACKEND_AVAILABLE
 from ai_novel_studio.ui_qml.bridge.draft_coordinator import (
     DRAFT_FAILED,
     DRAFT_IDLE,
     DraftCoordinator,
 )
 from ai_novel_studio.ui_qml.bridge.draft_port import DraftPort, GenerationConfig
-from ai_novel_studio.ui_qml.bridge.backend_availability import BACKEND_AVAILABLE
 from ai_novel_studio.ui_qml.bridge.dtos import (
+    AgentTimelineItemDto,
     ChapterDto,
     DiscussionMessageDto,
+    SelectionReferenceDto,
     SuggestionDto,
     UsageDto,
     VolumeDto,
+)
+from ai_novel_studio.ui_qml.bridge.models.agent_timeline_model import (
+    AgentTimelineModel,
 )
 from ai_novel_studio.ui_qml.bridge.models.chapter_list_model import ChapterListModel
 from ai_novel_studio.ui_qml.bridge.models.discussion_message_list_model import (
@@ -60,9 +66,29 @@ from ai_novel_studio.ui_qml.bridge.readonly_views import (
 )
 from ai_novel_studio.ui_qml.bridge.text_utils import count_words, format_word_count
 
-_NAV_IDS = ("writing", "characters", "memory", "clues", "audit", "settings")
+_NAV_IDS = ("writing", "library", "advanced", "settings")
+_NAV_ALIASES = {
+    "writing": "library",
+    "characters": "library",
+    "memory": "library",
+    "clues": "advanced",
+    "audit": "advanced",
+}
 _CREATION_MODES = ("BASIC", "STANDARD", "STRICT")
 _AUDIT_POLICIES = ("MINIMAL", "STANDARD", "DEEP")
+
+_AGENT_KINDS = {
+    "user_text",
+    "assistant_text",
+    "run_status",
+    "tool_call",
+    "tool_result",
+    "choice_card",
+    "text_diff",
+    "confirmation",
+    "warning",
+    "error",
+}
 
 
 def _mock_volumes() -> tuple[VolumeDto, ...]:
@@ -161,6 +187,9 @@ class MockNovelStudioFacade(QObject):
     draftAcceptedToEditor = Signal(str)
     editorRevisionChanged = Signal(int)
     discussion_changed = Signal()
+    agent_timeline_changed = Signal()
+    agent_busy_changed = Signal()
+    selection_reference_changed = Signal()
 
     def __init__(
         self,
@@ -185,6 +214,11 @@ class MockNovelStudioFacade(QObject):
         self._draft_diff_model = DraftDiffModel(self)
         self._discussion_model = DiscussionMessageListModel(self)
         self._discussion_busy = False
+        self._agent_timeline_model = AgentTimelineModel(self)
+        self._agent_busy = False
+        self._agent_step = 0
+        self._agent_timer: QTimer | None = None
+        self._selection_reference: SelectionReferenceDto | None = None
         self._draft_view = "draft"
         self._draft_base_body = ""
         self._draft_text = ""
@@ -213,7 +247,7 @@ class MockNovelStudioFacade(QObject):
         self._revision = self._chapters[0].revision
         self._editor_state = "CLEAN"
         self._save_status = "已载入 · 暂无未保存更改"
-        self._workspace: ProjectWorkspaceService | None = None
+        self._workspace: Any | None = None
         self._ai_drawer_open = False
         self._active_nav = "writing"
         self._reduce_motion = False
@@ -223,7 +257,7 @@ class MockNovelStudioFacade(QObject):
     @Property(str, notify=project_changed)
     def projectTitle(self) -> str:
         if self._workspace is not None:
-            return self._workspace.summary().title
+            return str(self._workspace.summary().title)
         return "雾港来信"
 
     @Property(str, notify=project_changed)
@@ -441,11 +475,11 @@ class MockNovelStudioFacade(QObject):
 
     @Property(str, notify=generation_config_changed)
     def generationMode(self) -> str:
-        return self._generation_config.mode.value
+        return self._generation_config.mode
 
     @Property(str, notify=generation_config_changed)
     def generationAuditPolicy(self) -> str:
-        return self._generation_config.audit_policy.value
+        return self._generation_config.audit_policy
 
     @Property(str, notify=usage_changed)
     def usageInputOutputText(self) -> str:
@@ -720,9 +754,10 @@ class MockNovelStudioFacade(QObject):
 
     @Slot(str)
     def setActiveNav(self, nav_id: str) -> None:
-        if nav_id not in _NAV_IDS or nav_id == self._active_nav:
+        normalized = _NAV_ALIASES.get(nav_id, nav_id)
+        if normalized not in _NAV_IDS or normalized == self._active_nav:
             return
-        self._active_nav = nav_id
+        self._active_nav = normalized
         self.active_nav_changed.emit()
 
     @Slot(int)
@@ -982,6 +1017,220 @@ class MockNovelStudioFacade(QObject):
         self._discussion_model.clear()
         self.discussion_changed.emit()
 
+    @Property(QObject, constant=True)
+    def agentTimeline(self) -> AgentTimelineModel:
+        return self._agent_timeline_model
+
+    @Property(bool, notify=agent_busy_changed)
+    def agentBusy(self) -> bool:
+        return self._agent_busy
+
+    @Property(bool, notify=selection_reference_changed)
+    def hasSelectionReference(self) -> bool:
+        return self._selection_reference is not None
+
+    @Property(str, notify=selection_reference_changed)
+    def selectionReferenceLabel(self) -> str:
+        if self._selection_reference is None:
+            return ""
+        ref = self._selection_reference
+        title = self._chapter_title(ref.chapter_id)
+        return f"{title} · {len(ref.selected_text)} 字"
+
+    @Property(str, notify=selection_reference_changed)
+    def selectionReferencePreview(self) -> str:
+        if self._selection_reference is None:
+            return ""
+        preview = self._selection_reference.selected_text.strip()
+        return preview[:80] + ("…" if len(preview) > 80 else "")
+
+    @Slot(str)
+    def setSelectionReferenceJson(self, payload_json: str) -> None:
+        from ai_novel_studio.ui_qml.bridge.models.selection_reference import (
+            parse_selection_reference,
+        )
+
+        if payload_json.strip() == "":
+            self._selection_reference = None
+            self.selection_reference_changed.emit()
+            return
+        reference = parse_selection_reference(payload_json)
+        if reference is None:
+            return
+        self._selection_reference = reference
+        self.selection_reference_changed.emit()
+
+    @Slot()
+    def clearSelectionReference(self) -> None:
+        if self._selection_reference is None:
+            return
+        self._selection_reference = None
+        self.selection_reference_changed.emit()
+
+    @Slot(str)
+    def startAgentTurn(self, text: str) -> None:
+        """Start a deterministic Mock Agent turn (C1)."""
+        normalized = text.strip()
+        if not normalized or self._agent_busy:
+            return
+        self._agent_timeline_model.append_item(
+            AgentTimelineItemDto(id=str(uuid4()), kind="user_text", text=normalized)
+        )
+        self._agent_busy = True
+        self._agent_step = 0
+        self.agent_busy_changed.emit()
+        self.agent_timeline_changed.emit()
+        self._schedule_agent_step()
+
+    @Slot()
+    def stopAgentTurn(self) -> None:
+        if not self._agent_busy:
+            return
+        self._stop_agent_timer()
+        self._agent_busy = False
+        self._agent_timeline_model.append_item(
+            AgentTimelineItemDto(
+                id=str(uuid4()),
+                kind="warning",
+                text="已停止 Mock 任务（真实 Agent 接入后支持中断恢复）",
+            )
+        )
+        self.agent_busy_changed.emit()
+        self.agent_timeline_changed.emit()
+
+    @Slot(int)
+    def agentReplyChoice(self, choice: int) -> None:
+        options = ("方案 A：保持悬念，下一章揭示", "方案 B：本章末尾点破", "方案 C：由读者自行推理")
+        if 0 <= choice < len(options):
+            self._append_agent_text(
+                f"你选择了：{options[choice]}（Mock 分支，真实决策需 Agent 后端）"
+            )
+
+    @Slot()
+    def approveAgentChangeSet(self) -> None:
+        self._append_agent_text(
+            "确认了修改方案。真实替换将在后续 Wave 接入（修订与哈希校验协议已预留）。"
+        )
+
+    @Slot()
+    def discardAgentChangeSet(self) -> None:
+        self._append_agent_text("已放弃该修改方案，正文保持不变。")
+
+    def _schedule_agent_step(self) -> None:
+        self._stop_agent_timer()
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.setInterval(120)
+        timer.timeout.connect(self._advance_agent)
+        self._agent_timer = timer
+        timer.start()
+
+    def _advance_agent(self) -> None:
+        if not self._agent_busy:
+            return
+        steps: list[AgentTimelineItemDto] = []
+        if self._agent_step == 0:
+            steps.append(
+                AgentTimelineItemDto(
+                    id=str(uuid4()),
+                    kind="run_status",
+                    label="正在读取当前章节和选区",
+                    busy=True,
+                    status="RUNNING",
+                )
+            )
+        elif self._agent_step == 1:
+            steps.append(
+                AgentTimelineItemDto(
+                    id=str(uuid4()),
+                    kind="tool_call",
+                    label="read_selection",
+                    text="读取正文选区与章节修订",
+                )
+            )
+        elif self._agent_step == 2:
+            ref = self._selection_reference
+            steps.append(
+                AgentTimelineItemDto(
+                    id=str(uuid4()),
+                    kind="tool_result",
+                    label="read_selection",
+                    text=(
+                        f"已读取 {self.currentChapterTitle} "
+                        f"{len(ref.selected_text) if ref else 0} 字"
+                    ),
+                )
+            )
+        elif self._agent_step == 3:
+            steps.append(
+                AgentTimelineItemDto(
+                    id=str(uuid4()),
+                    kind="run_status",
+                    label="正在生成修改稿",
+                    busy=False,
+                    status="DONE",
+                )
+            )
+        elif self._agent_step == 4:
+            current = (
+                self._selection_reference.selected_text
+                if self._selection_reference
+                else self._body_text[:120]
+            )
+            steps.append(
+                AgentTimelineItemDto(
+                    id=str(uuid4()),
+                    kind="text_diff",
+                    label="修改对比",
+                    current_text=current,
+                    draft_text=(
+                        "（Mock 修改稿）" + current[:40] + "…请人工确认后再替换。"
+                    ),
+                )
+            )
+        elif self._agent_step == 5:
+            steps.append(
+                AgentTimelineItemDto(
+                    id=str(uuid4()),
+                    kind="confirmation",
+                    label="确认操作",
+                    text="替换选区 / 再次修改 / 放弃",
+                )
+            )
+        else:
+            self._agent_busy = False
+            self.agent_busy_changed.emit()
+            self.agent_timeline_changed.emit()
+            return
+        for step in steps:
+            self._agent_timeline_model.append_item(step)
+        self._agent_step += 1
+        self.agent_timeline_changed.emit()
+        if self._agent_step <= 5:
+            self._schedule_agent_step()
+        else:
+            self._agent_busy = False
+            self.agent_busy_changed.emit()
+
+    def _append_agent_text(self, text: str) -> None:
+        self._agent_timeline_model.append_item(
+            AgentTimelineItemDto(id=str(uuid4()), kind="assistant_text", text=text)
+        )
+        self.agent_timeline_changed.emit()
+
+    def _stop_agent_timer(self) -> None:
+        if self._agent_timer is not None:
+            self._agent_timer.stop()
+            self._agent_timer.deleteLater()
+            self._agent_timer = None
+
+    def _chapter_title(self, chapter_id: str) -> str:
+        for volume in self._volumes:
+            for chapter in volume.chapters:
+                if chapter.id == chapter_id:
+                    return chapter.title
+        return "当前章节"
+
     @Slot(str, result=str)
     def openProject(self, root: str) -> str:
         """Open a real project read-only. Returns an error message or empty."""
@@ -1039,6 +1288,9 @@ class MockNovelStudioFacade(QObject):
 
     def _load_current_chapter_document(self) -> None:
         self._clear_draft_review_state()
+        if self._selection_reference is not None:
+            self._selection_reference = None
+            self.selection_reference_changed.emit()
         self._selected_character = None
         self._journey_model.set_items(())
         self.character_detail_changed.emit()

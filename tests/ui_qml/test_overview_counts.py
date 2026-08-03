@@ -1,12 +1,15 @@
 ﻿"""Frontend Wave F9: read-only overview counts for page skeletons."""
 
 from __future__ import annotations
+
 import pytest
+
 pytest.importorskip("ai_novel_studio.application")
 
 from pathlib import Path
 
 from ai_novel_studio.application.project_workspace_service import ProjectWorkspaceService
+
 from ai_novel_studio.ui_qml.bridge.mock_novel_studio_facade import MockNovelStudioFacade
 from ai_novel_studio.ui_qml.bridge.overview_counts import (
     OverviewCounts,

@@ -1,7 +1,9 @@
 ﻿"""Frontend Wave F12: read-only list views for page skeletons."""
 
 from __future__ import annotations
+
 import pytest
+
 pytest.importorskip("ai_novel_studio.application")
 
 from pathlib import Path
@@ -23,6 +25,7 @@ from ai_novel_studio.infrastructure.storage.character_memory_repository import (
     CharacterMemoryRepository,
 )
 from ai_novel_studio.infrastructure.storage.summary_repository import SummaryRepository
+
 from ai_novel_studio.ui_qml.bridge.mock_novel_studio_facade import MockNovelStudioFacade
 from ai_novel_studio.ui_qml.bridge.models.readonly_list_models import (
     AuditListModel,

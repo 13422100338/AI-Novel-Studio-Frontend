@@ -204,6 +204,40 @@ export function findNext(
   return { from: index, to: index + needle.length };
 }
 
+export interface SelectionReferencePayload {
+  chapterId: string;
+  baseRevision: number;
+  from: number;
+  to: number;
+  selectedText: string;
+  selectedTextHash: string;
+}
+
+export const MAX_SELECTION_CHARACTERS = 20_000;
+
+export function buildSelectionReference(
+  chapterId: string,
+  baseRevision: number,
+  from: number,
+  to: number,
+  selectedText: string,
+): SelectionReferencePayload | null {
+  if (!chapterId || baseRevision < 0 || from < 0 || to < from) {
+    return null;
+  }
+  if (!selectedText || selectedText.length > MAX_SELECTION_CHARACTERS) {
+    return null;
+  }
+  return {
+    chapterId,
+    baseRevision,
+    from,
+    to,
+    selectedText,
+    selectedTextHash: sha256(selectedText),
+  };
+}
+
 export function createDecorationsKey(): PluginKey {
   return new PluginKey("phase1Decorations");
 }
