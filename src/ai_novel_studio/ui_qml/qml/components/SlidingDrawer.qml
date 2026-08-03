@@ -7,6 +7,7 @@ import QtQuick.Layouts
 // the legacy DiscussionPanel is no longer the default rendering path.
 Item {
     id: root
+    objectName: "slidingDrawer"
     z: 100
 
     property bool open: false

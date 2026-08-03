@@ -3,6 +3,7 @@ import QtQuick.Layouts
 
 RowLayout {
     id: root
+    objectName: "agentRunStatus"
 
     property string label: ""
     property bool busy: false

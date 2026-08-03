@@ -3,6 +3,7 @@ import QtQuick.Layouts
 
 Rectangle {
     id: root
+    objectName: "choiceCard"
 
     property var options: []
     signal chosen(int index)

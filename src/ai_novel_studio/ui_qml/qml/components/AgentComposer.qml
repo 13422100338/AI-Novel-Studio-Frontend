@@ -4,6 +4,7 @@ import QtQuick.Layouts
 
 ColumnLayout {
     id: root
+    objectName: "agentComposer"
 
     signal sendRequested(string text)
     signal stopRequested()

@@ -17,6 +17,10 @@ Rectangle {
 
     Layout.fillWidth: true
     implicitWidth: parent ? parent.width : 320
+    // Single height authority (C1.3): the card's height is derived from its
+    // content, never from the parent. Without this, the card collapses to 0 in
+    // the timeline and later delegates overlap the previous ones.
+    implicitHeight: Math.max(40, body.implicitHeight + 20)
     radius: Theme.tokens.radius.r12
     color: Theme.tokens.color.bgSidebar
     border.color: Theme.tokens.color.border
@@ -26,6 +30,7 @@ Rectangle {
     property color titleColor: Theme.tokens.color.textPrimary
 
     ColumnLayout {
+        id: body
         anchors.fill: parent
         anchors.margins: 10
         spacing: 6

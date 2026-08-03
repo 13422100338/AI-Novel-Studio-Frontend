@@ -82,6 +82,10 @@ Item {
                         ? timeline.width
                         : timeline.width - root.scrollbarWidth - root.contentSafeMargin
                 )
+                // Single height authority (C1.3): the delegate height follows
+                // the loaded card's implicitHeight so the ListView lays cards
+                // out in order without overlap.
+                height: implicitHeight
                 sourceComponent: root.componentFor(kind)
 
                 onLoaded: {
@@ -176,6 +180,15 @@ Item {
                 visible: Facade.agentTimeline.count === 0
                 title: "AI 助手"
                 body: "就当前章节、正文选区或创作问题与 AI 商讨；回复为 Mock，后端 Agent 接入后启用真实操作。"
+            }
+        }
+
+        Connections {
+            target: Facade.agentTimeline
+            function onRowsInserted(parent, first, last) {
+                // Multi-turn chat behavior: follow new events to the bottom
+                // without disturbing the geometry of existing cards.
+                timeline.positionViewAtEnd()
             }
         }
 
