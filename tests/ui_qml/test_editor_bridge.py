@@ -1,3 +1,6 @@
+import pytest
+pytest.importorskip("ai_novel_studio.application")
+
 """Phase 1: editor bridge payload validation."""
 
 from pathlib import Path

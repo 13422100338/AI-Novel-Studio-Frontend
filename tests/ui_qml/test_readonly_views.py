@@ -1,6 +1,8 @@
-"""Frontend Wave F12: read-only list views for page skeletons."""
+﻿"""Frontend Wave F12: read-only list views for page skeletons."""
 
 from __future__ import annotations
+import pytest
+pytest.importorskip("ai_novel_studio.application")
 
 from pathlib import Path
 

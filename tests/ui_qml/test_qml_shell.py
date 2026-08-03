@@ -1,3 +1,6 @@
+import pytest
+pytest.importorskip("ai_novel_studio.application")
+
 from pathlib import Path
 
 from PySide6.QtCore import QMetaObject, QUrl

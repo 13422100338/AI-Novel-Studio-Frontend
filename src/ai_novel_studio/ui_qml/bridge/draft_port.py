@@ -18,15 +18,6 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Protocol
 
-from ai_novel_studio.application.project_generation_session import (
-    AcceptedGeneration,
-    ProjectGenerationSession,
-)
-from ai_novel_studio.application.prose_generation_service import (
-    ProseEventKind,
-    ProseGenerationEvent,
-)
-from ai_novel_studio.domain.generation import AuditPolicy, CreationMode, GenerationStatus
 from ai_novel_studio.ui_qml.bridge.dtos import UsageDto
 
 _DEFAULT_OUTPUT_TOKEN_LIMIT = 8192
@@ -42,8 +33,8 @@ class GenerationConfig:
 
     target_words: int = 800
     output_token_limit: int = _DEFAULT_OUTPUT_TOKEN_LIMIT
-    mode: CreationMode = CreationMode.BASIC
-    audit_policy: AuditPolicy = AuditPolicy.MINIMAL
+    mode: str = "BASIC"
+    audit_policy: str = "MINIMAL"
 
 
 class DraftPort(Protocol):
@@ -83,16 +74,24 @@ class ProjectSessionDraftPort:
         revision: int,
         config: GenerationConfig,
     ) -> str:
+        from ai_novel_studio.domain.generation import AuditPolicy, CreationMode
+
         self.session.select_chapter(chapter_id, revision)
         return self.session.prepare_generation(
-            config.mode,
+            CreationMode(config.mode),
             config.output_token_limit,
             config.target_words,
-            config.audit_policy,
+            AuditPolicy(config.audit_policy),
         )
 
     def generate(self, run_id: str) -> tuple[str, str]:
         """Consume the prose stream to completion and return (draft, error)."""
+        from ai_novel_studio.application.prose_generation_service import (
+            ProseEventKind,
+            ProseGenerationEvent,
+        )
+        from ai_novel_studio.domain.generation import GenerationStatus
+
         buffer: list[str] = []
         error = ""
         completed = False

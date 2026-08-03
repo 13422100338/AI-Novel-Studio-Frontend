@@ -9,18 +9,9 @@ subsystem never blocks the others or project loading.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
-from ai_novel_studio.application.character_status_service import CharacterStatusService
-from ai_novel_studio.application.memory_workspace_service import MemoryWorkspaceService
-from ai_novel_studio.application.project_audit_service import ProjectAuditService
-from ai_novel_studio.application.project_memory_workspace_gateway import (
-    ProjectMemoryWorkspaceGateway,
-)
-from ai_novel_studio.domain.memory import Authority, MemoryStatus, ReviewStatus
-from ai_novel_studio.infrastructure.storage.character_memory_repository import (
-    CharacterMemoryRepository,
-)
-from ai_novel_studio.infrastructure.storage.project_repository import ProjectRepository
+ProjectRepository = Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +77,20 @@ def readonly_views(
     chapter_id: str,
 ) -> ReadonlyViews:
     """Load the three read-only lists; each failing subsystem degrades to empty."""
+    from ai_novel_studio.application.character_status_service import (
+        CharacterStatusService,
+    )
+    from ai_novel_studio.application.memory_workspace_service import (
+        MemoryWorkspaceService,
+    )
+    from ai_novel_studio.application.project_audit_service import ProjectAuditService
+    from ai_novel_studio.application.project_memory_workspace_gateway import (
+        ProjectMemoryWorkspaceGateway,
+    )
+    from ai_novel_studio.infrastructure.storage.character_memory_repository import (
+        CharacterMemoryRepository,
+    )
+
     characters: tuple[CharacterViewDto, ...] = ()
     memories: tuple[MemoryViewDto, ...] = ()
     audits: tuple[AuditViewDto, ...] = ()

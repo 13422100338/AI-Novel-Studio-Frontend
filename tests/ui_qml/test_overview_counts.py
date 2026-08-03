@@ -1,6 +1,8 @@
-"""Frontend Wave F9: read-only overview counts for page skeletons."""
+﻿"""Frontend Wave F9: read-only overview counts for page skeletons."""
 
 from __future__ import annotations
+import pytest
+pytest.importorskip("ai_novel_studio.application")
 
 from pathlib import Path
 

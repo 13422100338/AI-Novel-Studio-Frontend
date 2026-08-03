@@ -17,16 +17,13 @@ from uuid import uuid4
 
 from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 
-from ai_novel_studio.application.project_audit_service import ProjectAuditService
-from ai_novel_studio.application.project_workspace_service import ProjectWorkspaceService
-from ai_novel_studio.domain.audit import AuditFindingStatus
-from ai_novel_studio.domain.generation import AuditPolicy, CreationMode
 from ai_novel_studio.ui_qml.bridge.draft_coordinator import (
     DRAFT_FAILED,
     DRAFT_IDLE,
     DraftCoordinator,
 )
 from ai_novel_studio.ui_qml.bridge.draft_port import DraftPort, GenerationConfig
+from ai_novel_studio.ui_qml.bridge.backend_availability import BACKEND_AVAILABLE
 from ai_novel_studio.ui_qml.bridge.dtos import (
     ChapterDto,
     DiscussionMessageDto,
@@ -64,6 +61,8 @@ from ai_novel_studio.ui_qml.bridge.readonly_views import (
 from ai_novel_studio.ui_qml.bridge.text_utils import count_words, format_word_count
 
 _NAV_IDS = ("writing", "characters", "memory", "clues", "audit", "settings")
+_CREATION_MODES = ("BASIC", "STANDARD", "STRICT")
+_AUDIT_POLICIES = ("MINIMAL", "STANDARD", "DEEP")
 
 
 def _mock_volumes() -> tuple[VolumeDto, ...]:
@@ -787,6 +786,15 @@ class MockNovelStudioFacade(QObject):
             self.editor_state_changed.emit()
             return
         try:
+            if not BACKEND_AVAILABLE:
+                self._save_status = "后端不可用：独立前端仓库无法持久化审校状态"
+                self.editor_state_changed.emit()
+                return
+            from ai_novel_studio.application.project_audit_service import (
+                ProjectAuditService,
+            )
+            from ai_novel_studio.domain.audit import AuditFindingStatus
+
             ProjectAuditService(
                 self._workspace.project
             ).update_finding_status(finding.id, AuditFindingStatus(status))
@@ -917,33 +925,29 @@ class MockNovelStudioFacade(QObject):
 
     @Slot(str)
     def setGenerationMode(self, value: str) -> None:
-        try:
-            mode = CreationMode(value)
-        except ValueError:
+        if value not in _CREATION_MODES:
             return
-        if mode == self._generation_config.mode:
+        if value == self._generation_config.mode:
             return
         self._generation_config = GenerationConfig(
             target_words=self._generation_config.target_words,
             output_token_limit=self._generation_config.output_token_limit,
-            mode=mode,
+            mode=value,
             audit_policy=self._generation_config.audit_policy,
         )
         self.generation_config_changed.emit()
 
     @Slot(str)
     def setGenerationAuditPolicy(self, value: str) -> None:
-        try:
-            policy = AuditPolicy(value)
-        except ValueError:
+        if value not in _AUDIT_POLICIES:
             return
-        if policy == self._generation_config.audit_policy:
+        if value == self._generation_config.audit_policy:
             return
         self._generation_config = GenerationConfig(
             target_words=self._generation_config.target_words,
             output_token_limit=self._generation_config.output_token_limit,
             mode=self._generation_config.mode,
-            audit_policy=policy,
+            audit_policy=value,
         )
         self.generation_config_changed.emit()
 
@@ -982,6 +986,12 @@ class MockNovelStudioFacade(QObject):
     def openProject(self, root: str) -> str:
         """Open a real project read-only. Returns an error message or empty."""
         try:
+            if not BACKEND_AVAILABLE:
+                return "后端不可用：独立前端仓库需在主仓库运行时才能打开项目"
+            from ai_novel_studio.application.project_workspace_service import (
+                ProjectWorkspaceService,
+            )
+
             workspace = ProjectWorkspaceService()
             workspace.open_project(Path(root))
         except Exception as exc:  # noqa: BLE001 - surfaced as UI copy, logged by caller if needed

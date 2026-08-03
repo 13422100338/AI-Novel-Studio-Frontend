@@ -1,6 +1,8 @@
-"""Frontend Wave F5: background draft coordinator with cooperative cancel."""
+﻿"""Frontend Wave F5: background draft coordinator with cooperative cancel."""
 
 from __future__ import annotations
+import pytest
+pytest.importorskip("ai_novel_studio.application")
 
 from pytestqt.qtbot import QtBot
 

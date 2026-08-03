@@ -1,3 +1,6 @@
+import pytest
+pytest.importorskip("ai_novel_studio.application")
+
 import threading
 
 from PySide6.QtCore import QObject

@@ -1,6 +1,8 @@
-"""Frontend Wave F2/F3: real-project wiring through the facade."""
+﻿"""Frontend Wave F2/F3: real-project wiring through the facade."""
 
 from __future__ import annotations
+import pytest
+pytest.importorskip("ai_novel_studio.application")
 
 from pathlib import Path
 

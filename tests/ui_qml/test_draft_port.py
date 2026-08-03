@@ -1,6 +1,8 @@
-"""Frontend Wave F4: real draft port over ProjectGenerationSession."""
+﻿"""Frontend Wave F4: real draft port over ProjectGenerationSession."""
 
 from __future__ import annotations
+import pytest
+pytest.importorskip("ai_novel_studio.application")
 
 from collections.abc import Iterator
 from pathlib import Path

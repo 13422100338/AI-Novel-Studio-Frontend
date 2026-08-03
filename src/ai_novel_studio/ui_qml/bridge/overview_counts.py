@@ -10,17 +10,9 @@ renders ``—``) instead of blocking project loading.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
-from ai_novel_studio.application.character_status_service import CharacterStatusService
-from ai_novel_studio.application.memory_workspace_service import MemoryWorkspaceService
-from ai_novel_studio.application.project_audit_service import ProjectAuditService
-from ai_novel_studio.application.project_memory_workspace_gateway import (
-    ProjectMemoryWorkspaceGateway,
-)
-from ai_novel_studio.infrastructure.storage.character_memory_repository import (
-    CharacterMemoryRepository,
-)
-from ai_novel_studio.infrastructure.storage.project_repository import ProjectRepository
+ProjectRepository = Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +27,20 @@ def readonly_overview_counts(
     chapter_id: str,
 ) -> OverviewCounts:
     """Return per-page counts; each failing query degrades to ``None``."""
+    from ai_novel_studio.application.character_status_service import (
+        CharacterStatusService,
+    )
+    from ai_novel_studio.application.memory_workspace_service import (
+        MemoryWorkspaceService,
+    )
+    from ai_novel_studio.application.project_audit_service import ProjectAuditService
+    from ai_novel_studio.application.project_memory_workspace_gateway import (
+        ProjectMemoryWorkspaceGateway,
+    )
+    from ai_novel_studio.infrastructure.storage.character_memory_repository import (
+        CharacterMemoryRepository,
+    )
+
     characters: int | None = None
     memory: int | None = None
     audit: int | None = None
@@ -65,4 +71,3 @@ def readonly_overview_counts(
         memory_count=memory,
         audit_count=audit,
     )
-
