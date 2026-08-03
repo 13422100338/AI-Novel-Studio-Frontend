@@ -8,6 +8,18 @@ Item {
     id: root
     objectName: "creativeAgentPanel"
 
+    // Shared responsive layout rules (C1.2):
+    // delegate width = timeline width - vertical scrollbar - safety margin.
+    // Every timeline card fills this width; nothing may use a fixed width.
+    property int scrollbarWidth: 10
+    property int contentSafeMargin: 12
+    // Test/diagnostic hook: lets a harness force delegate instantiation for
+    // layout assertions without scrolling. No effect in normal use.
+    property int timelineCacheBuffer: 0
+    // Before/after diagnostic hook: emulates the pre-C1.2 delegate width rule
+    // (cards run under the scrollbar). Normal use keeps this false.
+    property bool timelineDelegateFullWidth: false
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 12
@@ -48,16 +60,28 @@ Item {
 
         ListView {
             id: timeline
+            objectName: "agentTimeline"
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
+            cacheBuffer: root.timelineCacheBuffer
             spacing: 8
             model: Facade.agentTimeline
-            ScrollBar.vertical: ScrollBar {}
+            ScrollBar.vertical: ScrollBar {
+                width: root.scrollbarWidth
+                policy: ScrollBar.AsNeeded
+            }
 
             delegate: Loader {
                 id: delegateLoader
-                width: timeline.width
+                // Content width of the list viewport: never let a card extend
+                // under the scrollbar or past the visible area.
+                width: Math.max(
+                    0,
+                    root.timelineDelegateFullWidth
+                        ? timeline.width
+                        : timeline.width - root.scrollbarWidth - root.contentSafeMargin
+                )
                 sourceComponent: root.componentFor(kind)
 
                 onLoaded: {

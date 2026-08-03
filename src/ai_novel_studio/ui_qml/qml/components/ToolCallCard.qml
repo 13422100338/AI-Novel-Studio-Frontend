@@ -3,6 +3,7 @@ import QtQuick.Layouts
 
 Rectangle {
     id: root
+    objectName: "toolCallCard"
 
     property string label: ""
     property string text: ""
@@ -31,7 +32,7 @@ Rectangle {
             text: root.text
             font.pixelSize: 11
             color: Theme.tokens.color.textSecondary
-            elide: Text.ElideRight
+            wrapMode: Text.WordWrap
         }
     }
 }

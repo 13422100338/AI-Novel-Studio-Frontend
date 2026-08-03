@@ -2,6 +2,7 @@ import QtQuick
 
 Rectangle {
     id: root
+    objectName: "agentTextBlock"
 
     property string text: ""
     property bool user: false

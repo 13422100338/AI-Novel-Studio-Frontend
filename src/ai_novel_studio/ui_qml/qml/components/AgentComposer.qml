@@ -17,7 +17,7 @@ ColumnLayout {
         onCleared: Facade.clearSelectionReference()
     }
 
-    RowLayout {
+    Flow {
         Layout.fillWidth: true
         spacing: 4
 

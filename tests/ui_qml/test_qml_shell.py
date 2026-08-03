@@ -8,6 +8,7 @@ from pytestqt.qtbot import QtBot
 
 from ai_novel_studio.ui_qml.bootstrap import app_qml_path, register_frontend_types
 from ai_novel_studio.ui_qml.bridge.backend_availability import BACKEND_AVAILABLE
+from ai_novel_studio.ui_qml.bridge.dtos import AgentTimelineItemDto
 from ai_novel_studio.ui_qml.bridge.mock_novel_studio_facade import MockNovelStudioFacade
 from ai_novel_studio.ui_qml.bridge.theme_provider import ThemeProvider
 
@@ -256,7 +257,7 @@ def test_agent_dock_open_close_and_collapse(qtbot: QtBot) -> None:
 
     # Open through the facade (never by direct `root.open` assignment).
     facade.toggleAiDrawer(True)
-    qtbot.waitUntil(lambda: dock.property("width") == 400)
+    qtbot.waitUntil(lambda: dock.property("width") == 420)
     assert tab.property("visible") is False
 
     # Close through the panel header button; the expand tab must return.
@@ -270,16 +271,133 @@ def test_agent_dock_open_close_and_collapse(qtbot: QtBot) -> None:
     # Reopen from the tab.
     QMetaObject.invokeMethod(dock, "openFromTab")
     qtbot.waitUntil(lambda: facade.property("aiDrawerOpen") is True)
-    qtbot.waitUntil(lambda: dock.property("width") == 400)
+    qtbot.waitUntil(lambda: dock.property("width") == 420)
     assert tab.property("visible") is False
 
     # Width restore respects the configured bounds.
     dock.setProperty("currentWidth", 10_000)
     qtbot.waitUntil(lambda: dock.property("width") == 648)
     dock.setProperty("currentWidth", 0)
-    qtbot.waitUntil(lambda: dock.property("width") == 320)
+    qtbot.waitUntil(lambda: dock.property("width") == 360)
     QMetaObject.invokeMethod(dock, "resetWidth")
-    qtbot.waitUntil(lambda: dock.property("width") == 400)
+    qtbot.waitUntil(lambda: dock.property("width") == 420)
+
+
+def test_timeline_cards_stay_within_content_width(qtbot: QtBot) -> None:
+    """C1.2: every Agent card right edge stays inside the timeline content area.
+
+    Runs at the dock widths covered by the acceptance matrix (360/420/520),
+    plus a very narrow width to prove the delegate-width rule is not
+    accidentally bypassed with a fixed fallback.
+    """
+    engine = QQmlApplicationEngine()
+    _ACTIVE_ENGINES.append(engine)
+    engine.addImportPath(str(Path(app_qml_path()).parent))
+    facade = MockNovelStudioFacade()
+    theme = ThemeProvider()
+    register_frontend_types(engine, facade, theme)
+
+    timeline_model = facade.property("agentTimeline")
+    for kind in (
+        "user_text",
+        "tool_call",
+        "text_diff",
+        "confirmation",
+        "form_card",
+        "change_set",
+    ):
+        timeline_model.append_item(
+            AgentTimelineItemDto(
+                id=f"seed-{kind}",
+                kind=kind,
+                text=(
+                    "这是一段非常长的示例文本，用来验证卡片在窄面板下不会把右侧内容裁掉，"
+                    "并且会通过 WordWrap 换行而不是横向溢出。"
+                ),
+                label="修改对比 · 较长标题",
+                current_text="当前文本：" + "很长的当前内容，" * 8,
+                draft_text="修改文本：" + "很长的修改内容，" * 8,
+                field_labels=("人物名", "关系", "备注"),
+                field_values=("林默", "旧友", "待确认"),
+                target="人物 · 林默",
+                operation="更新",
+                before_text="码头工人" + "很长的旧值，" * 6,
+                after_text="退役水手" + "很长的新值，" * 6,
+                risk="高",
+                reason="Mock 提案：" + "来源理由，" * 10,
+            )
+        )
+
+    engine.loadData(
+        QByteArray(
+            b"""
+            import QtQuick
+            import QtQuick.Controls
+            import QtQuick.Layouts
+            import "components"
+            ApplicationWindow {
+                width: 700
+                height: 900
+                visible: true
+                Rectangle {
+                    id: host
+                    anchors.fill: parent
+                    color: "#202124"
+            CreativeAgentPanel {
+                anchors.fill: parent
+            }
+                }
+            }
+            """
+        ),
+        QUrl.fromLocalFile(str(Path(app_qml_path()).parent / "panel-harness.qml")),
+    )
+    root = engine.rootObjects()[0]
+    assert root is not None
+    root.show()
+    qtbot.waitUntil(lambda: root.width() > 0)
+    content = root.contentItem()
+
+    for panel_width in (360, 420, 520, 300):
+        root.resize(panel_width, 900)
+        qtbot.waitUntil(
+            lambda width=panel_width: root.width() == width,
+            timeout=5000,
+        )
+        panel = _find_quick_item(content, "creativeAgentPanel")
+        timeline = _find_quick_item(content, "agentTimeline")
+        assert panel is not None and timeline is not None
+
+        # Timeline content right edge = panel right edge minus panel margins.
+        panel_right = panel.x() + panel.width()
+        timeline_right = timeline.x() + timeline.width()
+        available_right = panel_right - 12
+        assert timeline_right <= available_right + 1
+
+        card_names = (
+            "agentTextBlock",  # user_text
+            "toolCallCard",  # tool_call
+            "textDiffCard",  # text_diff
+            "confirmationCard",  # confirmation
+            "formCard",  # form_card
+            "changeSetCard",  # change_set
+        )
+        for index, card_name in enumerate(card_names):
+            # ListView virtualizes delegates; bring each one into view first.
+            timeline.setProperty("currentIndex", index)
+            qtbot.waitUntil(
+                lambda name=card_name: _find_quick_item(content, name) is not None,
+                timeout=5000,
+            )
+            card = _find_quick_item(content, card_name)
+            assert card is not None, f"{card_name} missing at {panel_width}px"
+            card_right = card.x() + card.width()
+            assert (
+                card_right <= timeline_right + 1
+            ), (
+                f"{card_name} right edge {card_right} exceeds timeline "
+                f"{timeline_right} at panel width {panel_width}"
+            )
 
 
 def test_sidebar_search_filters_chapter_list(qtbot: QtBot) -> None:

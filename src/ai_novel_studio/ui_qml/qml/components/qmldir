@@ -1,4 +1,5 @@
 AppButton 1.0 AppButton.qml
+AgentCard 1.0 AgentCard.qml
 IconButton 1.0 IconButton.qml
 NavigationRail 1.0 NavigationRail.qml
 ContextSidebar 1.0 ContextSidebar.qml

@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 
-Rectangle {
+AgentCard {
     id: root
     objectName: "confirmationCard"
 
@@ -15,34 +15,20 @@ Rectangle {
     readonly property bool settled:
         state === "APPLIED" || state === "DISCARDED" || state === "CANCELLED"
 
-    width: parent ? parent.width : 320
-    implicitHeight: Math.max(30, row.implicitHeight + 12)
-    radius: Theme.tokens.radius.r12
-    color: Theme.tokens.color.bgSurface
-    border.color: Theme.tokens.color.border
-    border.width: 1
+    cardTitle: root.label
 
-    RowLayout {
-        id: row
-        anchors.fill: parent
-        anchors.margins: 8
+    Text {
+        Layout.fillWidth: true
+        text: root.text
+        font.pixelSize: 11
+        color: Theme.tokens.color.textSecondary
+        wrapMode: Text.WordWrap
+    }
+    Flow {
+        Layout.fillWidth: true
+        Layout.alignment: Qt.AlignRight
         spacing: 6
 
-        ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 2
-            Text {
-                text: root.label
-                font.pixelSize: 11
-                font.bold: true
-                color: Theme.tokens.color.textPrimary
-            }
-            Text {
-                text: root.text
-                font.pixelSize: 11
-                color: Theme.tokens.color.textSecondary
-            }
-        }
         AppButton {
             text: "取消"
             enabled: !root.settled

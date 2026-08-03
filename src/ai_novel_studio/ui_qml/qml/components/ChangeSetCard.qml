@@ -3,7 +3,7 @@ import QtQuick.Layouts
 
 // Mock change-set proposal card (C1.1): shows a proposed project mutation and
 // offers confirm/edit/discard. Nothing is applied to a real project in C1.
-Rectangle {
+AgentCard {
     id: root
     objectName: "changeSetCard"
 
@@ -23,115 +23,98 @@ Rectangle {
     readonly property bool settled:
         state === "APPLIED" || state === "DISCARDED" || state === "CANCELLED"
 
-    width: parent ? parent.width : 320
-    implicitHeight: Math.max(48, column.implicitHeight + 12)
-    radius: Theme.tokens.radius.r12
-    color: Theme.tokens.color.bgSidebar
-    border.color: Theme.tokens.color.border
-    border.width: 1
+    cardTitle: "变更提案 · " + root.operation
 
-    ColumnLayout {
-        id: column
-        anchors.fill: parent
-        anchors.margins: 8
-        spacing: 4
+    GridLayout {
+        Layout.fillWidth: true
+        columns: 2
+        columnSpacing: 8
+        rowSpacing: 2
 
         Text {
-            text: "变更提案 · " + root.operation
-            font.pixelSize: 11
-            font.bold: true
+            text: "对象"
+            font.pixelSize: 10
+            color: Theme.tokens.color.textSecondary
+        }
+        Text {
+            Layout.fillWidth: true
+            text: root.target
+            font.pixelSize: 10
+            wrapMode: Text.WordWrap
             color: Theme.tokens.color.textPrimary
         }
-
-        GridLayout {
-            Layout.fillWidth: true
-            columns: 2
-            columnSpacing: 8
-            rowSpacing: 2
-
-            Text {
-                text: "对象"
-                font.pixelSize: 10
-                color: Theme.tokens.color.textSecondary
-            }
-            Text {
-                Layout.fillWidth: true
-                text: root.target
-                font.pixelSize: 10
-                color: Theme.tokens.color.textPrimary
-            }
-            Text {
-                text: "修改前"
-                font.pixelSize: 10
-                color: Theme.tokens.color.textSecondary
-            }
-            Text {
-                Layout.fillWidth: true
-                text: root.beforeText
-                font.pixelSize: 10
-                color: Theme.tokens.color.textPrimary
-            }
-            Text {
-                text: "修改后"
-                font.pixelSize: 10
-                color: Theme.tokens.color.textSecondary
-            }
-            Text {
-                Layout.fillWidth: true
-                text: root.afterText
-                font.pixelSize: 10
-                color: Theme.tokens.color.warning
-            }
-            Text {
-                text: "风险"
-                font.pixelSize: 10
-                color: Theme.tokens.color.textSecondary
-            }
-            Text {
-                Layout.fillWidth: true
-                text: root.risk
-                font.pixelSize: 10
-                color: root.risk === "高"
-                    ? Theme.tokens.color.danger
-                    : Theme.tokens.color.textPrimary
-            }
-            Text {
-                text: "来源"
-                font.pixelSize: 10
-                color: Theme.tokens.color.textSecondary
-            }
-            Text {
-                Layout.fillWidth: true
-                text: root.reason
-                font.pixelSize: 10
-                color: Theme.tokens.color.textPrimary
-                wrapMode: Text.WordWrap
-            }
+        Text {
+            text: "修改前"
+            font.pixelSize: 10
+            color: Theme.tokens.color.textSecondary
         }
-
-        RowLayout {
+        Text {
             Layout.fillWidth: true
-            spacing: 6
+            text: root.beforeText
+            font.pixelSize: 10
+            wrapMode: Text.WordWrap
+            color: Theme.tokens.color.textPrimary
+        }
+        Text {
+            text: "修改后"
+            font.pixelSize: 10
+            color: Theme.tokens.color.textSecondary
+        }
+        Text {
+            Layout.fillWidth: true
+            text: root.afterText
+            font.pixelSize: 10
+            wrapMode: Text.WordWrap
+            color: Theme.tokens.color.warning
+        }
+        Text {
+            text: "风险"
+            font.pixelSize: 10
+            color: Theme.tokens.color.textSecondary
+        }
+        Text {
+            Layout.fillWidth: true
+            text: root.risk
+            font.pixelSize: 10
+            wrapMode: Text.WordWrap
+            color: root.risk === "高"
+                ? Theme.tokens.color.danger
+                : Theme.tokens.color.textPrimary
+        }
+        Text {
+            text: "来源"
+            font.pixelSize: 10
+            color: Theme.tokens.color.textSecondary
+        }
+        Text {
+            Layout.fillWidth: true
+            text: root.reason
+            font.pixelSize: 10
+            wrapMode: Text.WordWrap
+            color: Theme.tokens.color.textPrimary
+        }
+    }
 
-            Item {
-                Layout.fillWidth: true
-            }
-            AppButton {
-                text: "放弃"
-                enabled: !root.settled
-                onClicked: root.discard()
-            }
-            AppButton {
-                text: "编辑"
-                enabled: !root.settled
-                onClicked: root.edit()
-            }
-            AppButton {
-                text: "确认"
-                primary: true
-                enabled: !root.settled
-                onClicked: root.approve()
-            }
+    Flow {
+        Layout.fillWidth: true
+        Layout.alignment: Qt.AlignRight
+        spacing: 6
+
+        AppButton {
+            text: "放弃"
+            enabled: !root.settled
+            onClicked: root.discard()
+        }
+        AppButton {
+            text: "编辑"
+            enabled: !root.settled
+            onClicked: root.edit()
+        }
+        AppButton {
+            text: "确认"
+            primary: true
+            enabled: !root.settled
+            onClicked: root.approve()
         }
     }
 }

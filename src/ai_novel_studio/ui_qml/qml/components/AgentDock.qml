@@ -10,8 +10,8 @@ Item {
 
     property bool open: false
     property int collapsedWidth: 34
-    property int defaultWidth: 400
-    property int minWidth: 320
+    property int defaultWidth: 420
+    property int minWidth: 360
     property int maxWidth: Math.max(320, Math.round(windowWidth * 0.45))
     property int windowWidth: 1440
     property int currentWidth: defaultWidth
