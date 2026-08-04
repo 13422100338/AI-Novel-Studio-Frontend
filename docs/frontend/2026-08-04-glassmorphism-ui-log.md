@@ -403,3 +403,25 @@ dark 下明显、light 下几乎看不出。本轮结论：**视觉近似可行�
 - 真机 windowed 像素：AI 面板左上与右上亮度相近（light 220/225、dark 42/46），
   斜向高光消失；顶部边缘光保留（dark 71.8 vs 底部 47.6）；面板右侧外沿无
   阴影渐变，外投影已彻底移除。
+
+## 15. 追加（2026-08-04）：中央正文工作区统一为玻璃样式
+
+用户反馈第五轮：最中间的文本框（正文工作区）也应该改成相同的玻璃样式。
+
+### 15.1 改动
+
+- `VisualLab.qml`：中央正文从不透明 `PaperSurface` 换成 `AcrylicSurface`
+  （objectName 保留 `labPaperSurface`），`sourceItem: backgroundLayer`、
+  `radius: r12`，与 AI 面板一致；内部章节标题/正文段落/状态行布局不变。
+  Safe 档自动回退为不透明 `bgSurface`（AcrylicSurface 既有行为）。
+- `test_visual_lab.py`：统一材质测试从三栏扩展为四面板
+  （`test_four_main_panels_share_unified_edge_material`），断言正文面板
+  `elevated` 不存在、LiquidLights 强度与 AI 面板一致、`sourceItem` 为
+  `labBackgroundLayer`。
+
+### 15.2 验证
+
+- 前端 pytest 167 passed / 35 skipped；ruff 通过；mypy（项目配置）通过。
+- 真机 windowed 像素：正文顶部边缘光与 AI 面板一致（dark 72.8 vs 71.2、
+  light 246.7 vs 240.9），正文区域呈现玻璃质感（dark body 56、light 230，
+  半透明透出背景冷调光晕）。

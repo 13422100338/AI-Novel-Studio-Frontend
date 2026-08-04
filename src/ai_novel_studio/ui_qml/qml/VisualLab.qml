@@ -9,7 +9,7 @@ import "surfaces"
 // Visual V0 rework (diagnosis doc: AI_Novel_Studio_Visual_V0实验页问题诊断与下一版重做要求.md).
 // The lab is now a scaled-down, business-free four-column mirror of the
 // target writing workspace:
-//   NavigationRail | ContextSidebar | PaperSurface (正文) | AI Acrylic Panel
+//   NavigationRail | ContextSidebar | Acrylic editor (正文) | AI Acrylic Panel
 //
 // Route decisions (course correction):
 // - Opaque ApplicationWindow; BackdropLayer covers the whole window with a
@@ -269,15 +269,19 @@ ApplicationWindow {
                 }
             }
 
-            // 3. Central manuscript paper (opaque, warm, stable).
+            // 3. Central manuscript workspace — same glass material as the
+            // side panels (user feedback: the central editor should share the
+            // unified glass style, blurring the same BackdropLayer glow).
             Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 
-                PaperSurface {
+                AcrylicSurface {
                     objectName: "labPaperSurface"
                     anchors.fill: parent
                     anchors.margins: 12
+                    sourceItem: backgroundLayer
+                    radius: Theme.tokens.radius.r12
 
                     ColumnLayout {
                         anchors.fill: parent

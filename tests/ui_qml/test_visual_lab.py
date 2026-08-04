@@ -283,18 +283,22 @@ def test_liquid_glass_layers_follow_quality_tiers(qtbot: QtBot) -> None:
     assert liquid_lights.property("visible") is True
 
 
-def test_three_main_panels_share_unified_edge_material(qtbot: QtBot) -> None:
-    """Nav rail, chapter sidebar and AI panel share the same flat edge
-    treatment: no per-panel drop-shadow switch left in the shared surface
-    (user feedback: edges must be unified) and identical LiquidLights layer."""
+def test_four_main_panels_share_unified_edge_material(qtbot: QtBot) -> None:
+    """Nav rail, chapter sidebar, central editor and AI panel share the same
+    flat edge treatment: no per-panel drop-shadow switch left in the shared
+    surface (user feedback: edges must be unified) and identical LiquidLights
+    layer. The central editor also blurs the same BackdropLayer glow."""
     _, _, _, window = _load_lab(qtbot)
     content = _content(window)
     acrylic = _find_item(content, "labAcrylicSurface")
     nav = _find_item(content, "labNavRail")
     sidebar = _find_item(content, "labChapterSidebar")
+    editor = _find_item(content, "labPaperSurface")
+    background = _find_item(content, "labBackgroundLayer")
     assert acrylic is not None and nav is not None and sidebar is not None
+    assert editor is not None and background is not None
 
-    for item in (nav, sidebar, acrylic):
+    for item in (nav, sidebar, editor, acrylic):
         # The drop-shadow toggle was removed from the shared surface: every
         # panel is flat and none can carry a shadow while others do not.
         assert item.property("elevated") is None, item.objectName()
@@ -310,6 +314,11 @@ def test_three_main_panels_share_unified_edge_material(qtbot: QtBot) -> None:
             float(lights.property("innerShadowOpacity"))
             - float(acrylic.property("innerShadowOpacity"))
         ) < 1e-6, f"{item.objectName()}: inner shadow must match AI panel"
+
+    # The central editor is glass now, not the opaque paper surface: it must
+    # capture the same backdrop layer as the AI panel.
+    assert editor.property("sourceItem") is not None
+    assert editor.property("sourceItem").objectName() == "labBackgroundLayer"
 
 
 def test_agent_cards_share_liquid_edge_lights(qtbot: QtBot) -> None:
