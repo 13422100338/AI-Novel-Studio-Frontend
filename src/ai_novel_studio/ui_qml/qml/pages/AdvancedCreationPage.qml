@@ -22,11 +22,15 @@ Item {
         TabBar {
             id: tabs
             Layout.fillWidth: true
+            background: Rectangle {
+                color: "transparent"
+            }
             Repeater {
                 model: ["伏笔与回收", "故事线", "时间线", "人物认知", "一致性审查", "影响分析"]
-                delegate: TabButton {
+                delegate: ThemedTabButton {
                     text: modelData
-                    width: implicitWidth
+                    checked: tabs.currentIndex === index
+                    onClicked: tabs.currentIndex = index
                 }
             }
         }

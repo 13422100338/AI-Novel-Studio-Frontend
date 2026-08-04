@@ -23,11 +23,15 @@ Item {
             id: tabs
             objectName: "memoryLibraryTabs"
             Layout.fillWidth: true
+            background: Rectangle {
+                color: "transparent"
+            }
             Repeater {
                 model: ["角色", "世界", "剧情记忆", "待处理"]
-                delegate: TabButton {
+                delegate: ThemedTabButton {
                     text: modelData
-                    width: implicitWidth
+                    checked: tabs.currentIndex === index
+                    onClicked: tabs.currentIndex = index
                 }
             }
         }
