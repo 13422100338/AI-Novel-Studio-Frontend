@@ -1,8 +1,10 @@
 AppButton 1.0 AppButton.qml
 AgentCard 1.0 AgentCard.qml
+GlassSlider 1.0 GlassSlider.qml
 IconButton 1.0 IconButton.qml
 NavigationRail 1.0 NavigationRail.qml
 ContextSidebar 1.0 ContextSidebar.qml
+SliderTemplateDock 1.0 SliderTemplateDock.qml
 StatusChip 1.0 StatusChip.qml
 SlidingDrawer 1.0 SlidingDrawer.qml
 SearchField 1.0 SearchField.qml

@@ -32,7 +32,7 @@ os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from PySide6.QtCore import QUrl  # noqa: E402
+from PySide6.QtCore import QMetaObject, QUrl  # noqa: E402
 from PySide6.QtGui import QGuiApplication, QImage  # noqa: E402
 from PySide6.QtQml import QQmlApplicationEngine  # noqa: E402
 from PySide6.QtQuick import QQuickItem, QQuickWindow  # noqa: E402
@@ -143,6 +143,26 @@ def main() -> int:
     capture("light", "balanced", "visual-v0-rework-light-balanced.png")
     capture("light", "premium", "visual-v0-rework-light-premium.png")
     capture("paper", "balanced", "visual-v0-rework-resized.png", size=(1280, 800))
+
+    # Slider template showcase (dock folds up from the bottom).
+    def capture_slider_template(theme_name: str, filename: str) -> None:
+        theme.setTheme(theme_name)
+        theme.setVisualQuality("premium")
+        button = _find_item(root.contentItem(), "labSliderTemplateButton")
+        assert button is not None, f"{filename}: slider template button missing"
+        dock = _find_item(root.contentItem(), "sliderTemplateDock")
+        if dock is None or dock.property("visible") is not True:
+            QMetaObject.invokeMethod(button, "clicked")
+        _pump(app, 16)  # stagger entrance (180ms + 3x40ms) settles
+        assert _backdrop_covers(root), f"{filename}: backdrop never covered window"
+        image = root.grabWindow()
+        _assert_clean_window(root, image, filename)
+        path = OUT_DIR / filename
+        assert image.save(str(path)), f"failed to save {path}"
+        print(f"saved {path}")
+
+    capture_slider_template("paper", "visual-v0-rework-slider-template.png")
+    capture_slider_template("dark", "visual-v0-rework-slider-template-dark.png")
 
     engine.deleteLater()
     return 0

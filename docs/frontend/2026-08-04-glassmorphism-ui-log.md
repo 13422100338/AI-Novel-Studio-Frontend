@@ -426,6 +426,64 @@ dark 下明显、light 下几乎看不出。本轮结论：**视觉近似可行�
   light 246.7 vs 240.9），正文区域呈现玻璃质感（dark body 56、light 230，
   半透明透出背景冷调光晕）。
 
+## 17. 追加（2026-08-04）：滑动条范本 GlassSlider + SliderTemplateDock
+
+用户要求“做一个作为范本的滑动条 UI 在实验页面”，并明确调用相关 skill。本轮
+按用户指定使用：frontend-design（组件设计质量）、emil-design-eng（打磨与动效
+决策）、apple-design（手势/弹簧）、animation-vocabulary（动效术语），最后用
+review-animations 对成品做自审（结论见 17.4）。
+
+### 17.1 GlassSlider（可复用滑动条组件）
+
+- 拖动：指针按下立即响应、拖动全程 1:1 跟手（apple-design §1/§2 直接操作），
+  数值在按下瞬间即更新，不等到松开。
+- 数值：任何赋值都走统一校验（clamp + stepSize 取整），程序赋值与指针输入
+  同一路径；Safe / Balanced / Premium 均可用（玻璃 UI 文档 §12.3：业务功能
+  不依赖视觉效果）。
+- 动效：拇指 x 用可打断 Behavior + SpringAnimation（spring 2.5 / damping 0.9，
+  拖动中禁用保证 1:1），按下 scale 1.18（反馈在 pointer-down），松开弹簧回弹
+  （damping 0.7，仅因拖动带动量才允许轻微过冲）；数值气泡从 scale(0.95) +
+  opacity 进入（emil：禁止 scale(0)），110/160ms 均 < 300ms。
+- 档位：Safe 实色拇指/轨道、无玻璃 rim；Balanced 常规；Premium 轨道渐变 +
+  弹簧。气泡为玻璃药丸（LiquidLights 边缘光 + 内阴影）。
+- reduceMotion：`springEnabled` 统一控制，关闭弹簧/行为、气泡 opacity 变 0ms，
+  Facade 不可用时兜底为启用弹簧（AppButton 同款守卫模式）。
+- 命名：用 `interactive` 而非 `enabled`，避免覆盖 Item 内置 `enabled` 属性
+  （Qt 警告），这是实现过程中修掉的一个真实问题。
+
+### 17.2 SliderTemplateDock（范本展示）
+
+- 从底部上翻（与 ExperimentControlPanel 同款模式，不遮挡工作区），Escape /
+  关闭按钮收起，收起无动画（工具条高频动作，emil：不动画）。
+- 四个样例：生成强度（实时气泡 · 弹簧）、章节字数目标（步进 100 · 常显数值）、
+  面板透明度（禁用态）、氛围温度（自定义 accent · 负区间）。
+- 入场：四列 40ms 间隔 stagger（fade + 6px 上浮，180ms OutCubic），
+  reduceMotion 时直接显示。
+
+### 17.3 接入与验证
+
+- Header 新增“滑动条范本”按钮；dock 挂在 ColumnLayout 底部。
+- qmldir 注册 GlassSlider / SliderTemplateDock。
+- 新增 5 个 QML 测试：dock 开关、数值→拇指 1:1 映射与 clamp/step、禁用态与
+  Safe 档功能、reduceMotion 降级、dock 边缘光统一。
+- 前端 pytest 176 passed / 35 skipped；ruff 通过；mypy（项目配置）通过。
+- 真机 windowed 截图：`visual-v0-rework-slider-template.png`（paper premium）
+  与 `visual-v0-rework-slider-template-dark.png`（dark premium）；像素采样确认
+  底部 dock 区域存在多个彩色 thumb（饱和像素占比 ~2%）。
+
+### 17.4 review-animations 自审结论
+
+| Before（朴素基线） | After（本轮实现） | Why |
+| --- | --- | --- |
+| 拇指改值瞬间跳变 | Behavior on x + Spring（拖动中禁用） | 手势动效必须可打断、跟手（apple-design §3/§4） |
+| 气泡从 scale(0) 出现 | scale 0.95→1 + opacity 110ms | 万物不从“无”出现（emil） |
+| 按下无反馈 | 拇指 pointer-down 即 scale 1.18 | 反馈发生在按下而非松开（apple §1） |
+| 四列同时出现 | 40ms stagger（180ms OutCubic） | 成组入场读作级联而非一次性 |
+| 直接读 Facade.reduceMotion | springEnabled 统一守卫 | reduceMotion 生效且上下文缺失时安全 |
+
+**Verdict: Approve**——全部动效 ≤180ms、仅 transform/opacity、手势弹簧可打断、
+reduceMotion 完整降级、无 scale(0)/ease-in、工具条关闭无动画。
+
 ## 16. 追加（2026-08-04）：Header 玻璃化、控制条边缘统一、资源门禁
 
 “做下一波”收尾：实验页剩余大容器统一玻璃语言，并补齐资源/几何门禁测试。

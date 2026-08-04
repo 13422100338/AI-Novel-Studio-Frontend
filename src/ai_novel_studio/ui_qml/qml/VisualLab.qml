@@ -40,6 +40,7 @@ ApplicationWindow {
     font.family: Theme.tokens.font.ui
 
     property bool experimentOpen: false
+    property bool templateDockOpen: false
     property bool debugBackdrop: false
     property bool debugSourceRect: false
     property bool debugBlurRegion: false
@@ -106,6 +107,13 @@ ApplicationWindow {
                     text: "实验控制"
                     ghost: true
                     onClicked: root.experimentOpen = true
+                }
+                AppButton {
+                    objectName: "labSliderTemplateButton"
+                    text: "滑动条范本"
+                    ghost: true
+                    selected: root.templateDockOpen
+                    onClicked: root.templateDockOpen = !root.templateDockOpen
                 }
             }
         }
@@ -528,6 +536,19 @@ ApplicationWindow {
                     }
                 }
             }
+        }
+
+        // --- Slider template dock: folds up from the bottom so it never
+        // covers the workspace (same pattern as the experiment strip).
+        SliderTemplateDock {
+            id: sliderTemplateDock
+            objectName: "sliderTemplateDock"
+            Layout.fillWidth: true
+            Layout.preferredHeight:
+                root.templateDockOpen ? sliderTemplateDock.implicitHeight : 0
+            clip: true
+            visible: root.templateDockOpen
+            onClosed: root.templateDockOpen = false
         }
     }
 }

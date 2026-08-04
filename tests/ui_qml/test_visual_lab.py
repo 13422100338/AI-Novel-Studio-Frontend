@@ -119,6 +119,11 @@ def test_visual_lab_loads_four_column_workspace(qtbot: QtBot) -> None:
         "experimentOpenButton",
         "experimentControlPanel",
         "experimentCloseButton",
+        "labSliderTemplateButton",
+        "sliderTemplateDock",
+        "glassSliderPrimary",
+        "glassSliderSteps",
+        "glassSliderDisabled",
         "labMicaToggle",
         "labDebugBackdropToggle",
         "labDebugSourceRectToggle",
@@ -635,6 +640,112 @@ def test_debug_overlay_toggles_propagate_to_window(qtbot: QtBot) -> None:
     assert window.property("debugBlurRegion") is False
     QMetaObject.invokeMethod(blur_toggle, "clicked")
     qtbot.waitUntil(lambda: window.property("debugBlurRegion") is True)
+
+
+def _open_slider_dock(window: QQuickWindow) -> None:
+    button = _find_item(window.contentItem(), "labSliderTemplateButton")
+    assert button is not None
+    QMetaObject.invokeMethod(button, "clicked")
+
+
+def test_slider_template_dock_opens_and_closes(qtbot: QtBot) -> None:
+    """The slider showcase folds up from the bottom like the experiment strip
+    and never needs to cover the workspace."""
+    _, _, _, window = _load_lab(qtbot)
+    content = _content(window)
+    dock = _find_item(content, "sliderTemplateDock")
+    close_button = _find_item(content, "sliderTemplateCloseButton")
+    assert dock is not None and close_button is not None
+    assert dock.property("visible") is False
+
+    _open_slider_dock(window)
+    qtbot.waitUntil(lambda: dock.property("visible") is True)
+    qtbot.wait(60)
+
+    QMetaObject.invokeMethod(close_button, "clicked")
+    qtbot.waitUntil(lambda: dock.property("visible") is False)
+
+
+def test_glass_slider_value_mapping_steps_and_clamp(qtbot: QtBot) -> None:
+    """The GlassSlider maps value to thumb 1:1, clamps out-of-range input and
+    snaps to step through one validation path (property guard)."""
+    _, facade, _, window = _load_lab(qtbot)
+    # Deterministic geometry: disable springs first, then check the 1:1 map.
+    facade.setReduceMotion(True)
+    _open_slider_dock(window)
+    qtbot.wait(80)
+    primary = _find_item(_content(window), "glassSliderPrimary")
+    steps = _find_item(_content(window), "glassSliderSteps")
+    assert primary is not None and steps is not None
+
+    # 42 of 0..100 -> normalized 0.42 and thumb centered there.
+    primary.setProperty("value", 42.0)
+    qtbot.wait(20)
+    assert abs(float(primary.property("normalized")) - 0.42) < 0.001
+    expected = (
+        float(primary.property("trackLeft"))
+        + 0.42 * float(primary.property("trackWidth"))
+    )
+    assert abs(float(primary.property("thumbCenterX")) - expected) < 0.5
+
+    # Out-of-range clamps to 100 (normalized 1.0).
+    primary.setProperty("value", 500.0)
+    qtbot.wait(20)
+    assert abs(float(primary.property("normalized")) - 1.0) < 0.001
+
+    # Step slider snaps 2150 -> 2200 (step 100), stays inside 800..4000.
+    steps.setProperty("value", 2150.0)
+    qtbot.wait(20)
+    assert abs(float(steps.property("value")) - 2200.0) < 0.001
+
+
+def test_glass_slider_disabled_and_safe_stay_functional(qtbot: QtBot) -> None:
+    """Disabled sliders refuse interaction but keep valid values; Safe tier
+    strips visuals without breaking functionality (glass-UI doc §12.3)."""
+    _, _, theme, window = _load_lab(qtbot)
+    _open_slider_dock(window)
+    qtbot.wait(80)
+    disabled = _find_item(_content(window), "glassSliderDisabled")
+    primary = _find_item(_content(window), "glassSliderPrimary")
+    assert disabled is not None and primary is not None
+
+    assert disabled.property("interactive") is False
+    assert abs(float(disabled.property("value")) - 60.0) < 0.001
+
+    theme.setVisualQuality("safe")
+    qtbot.wait(40)
+    primary.setProperty("value", 30.0)
+    qtbot.wait(20)
+    assert abs(float(primary.property("normalized")) - 0.30) < 0.001
+
+
+def test_glass_slider_respects_reduce_motion(qtbot: QtBot) -> None:
+    """Facade.reduceMotion disables the spring/behavior layer so the slider
+    stays crisp and static (apple-design §14)."""
+    _, facade, _, window = _load_lab(qtbot)
+    _open_slider_dock(window)
+    qtbot.wait(80)
+    primary = _find_item(_content(window), "glassSliderPrimary")
+    assert primary is not None
+
+    assert primary.property("springEnabled") is True
+    facade.setReduceMotion(True)
+    qtbot.waitUntil(lambda: primary.property("springEnabled") is False)
+
+
+def test_slider_dock_shares_unified_edge_lights(qtbot: QtBot) -> None:
+    """The showcase dock carries the same faint edge light + inner shadow as
+    cards so every container keeps the shared material language."""
+    _, _, _, window = _load_lab(qtbot)
+    _open_slider_dock(window)
+    qtbot.wait(80)
+    dock = _find_item(_content(window), "sliderTemplateDock")
+    assert dock is not None
+    lights = _find_item(dock, "sliderDockLiquidLights")
+    assert lights is not None
+    assert lights.property("visible") is True
+    assert float(lights.property("edgeLightOpacity")) > 0
+    assert float(lights.property("innerShadowOpacity")) > 0
 
 
 def test_streaming_glow_degrades_with_reduce_motion(qtbot: QtBot) -> None:
