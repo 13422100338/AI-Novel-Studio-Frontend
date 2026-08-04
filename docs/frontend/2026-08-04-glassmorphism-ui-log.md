@@ -375,3 +375,31 @@ dark 下明显、light 下几乎看不出。本轮结论：**视觉近似可行�
   mypy（项目配置）通过。
 - 真机 windowed 像素：light/dark 面板底部内阴影亮度差收敛到 ~8-10/255
   （此前层级明显更深）；卡片内阴影 ~0.04-0.05，肉眼为极淡层次。
+
+## 14. 追加（2026-08-04）：删除斜向高光、三栏边缘统一、背景光为光源
+
+用户反馈第四轮：
+1. 三个主窗口（导航轨 / 章节侧栏 / AI 面板）边缘设计不统一——有的有阴影、
+   有的没有；
+2. 斜向高光不要再加了；
+3. 玻璃的光改为来自背景板（BackdropLayer）的背景光。
+
+### 14.1 结构改动
+
+- `LiquidLights.qml`：删除 `specularOpacity` 属性与斜向高光绘制逻辑，组件只
+  保留顶/左边缘光 + 底/右内阴影，自绘圆角 clip 不变。注释明确：光来自
+  BackdropLayer 背景光晕，不在面板表面画高光。
+- `AcrylicSurface.qml`：删除 `elevated` 属性与外投影 Rectangle——三个玻璃
+  面板统一为 1px 边框 + LiquidLights 边缘光/内阴影，不再出现"有的面板带投影、
+  有的没有"；删除 specular 绑定。
+- `VisualLab.qml`：移除导航轨/章节侧栏的 `elevated: false`（属性已删除）。
+- `theme_provider.py`：移除 `glassSpecular*` token；paper/light 背景光晕
+  增强（0.14/0.12、0.28/0.24）补偿浅色下失去 specular 后的可读性。
+
+### 14.2 验证
+
+- 前端 pytest 167 passed / 35 skipped（新增"三栏统一边缘材质"测试：断言
+  共享表面无 `elevated` 开关、三栏 LiquidLights 强度一致）；ruff / mypy 通过。
+- 真机 windowed 像素：AI 面板左上与右上亮度相近（light 220/225、dark 42/46），
+  斜向高光消失；顶部边缘光保留（dark 71.8 vs 底部 47.6）；面板右侧外沿无
+  阴影渐变，外投影已彻底移除。

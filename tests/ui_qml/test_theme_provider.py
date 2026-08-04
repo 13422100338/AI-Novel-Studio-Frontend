@@ -46,22 +46,27 @@ def test_theme_provider_is_qobject() -> None:
 
 
 def test_liquid_glass_tokens_per_theme_and_tier() -> None:
-    """iOS 26 Liquid Glass layer tokens: premium > balanced in every theme,
-    and light mode carries the strongest specular so the material reads on a
-    light canvas (matte & bright, per cupertino_liquid_glass guidance)."""
+    """Edge light/inner shadow tokens: premium > balanced in every theme. The
+    diagonal specular sheen was removed per user feedback (the light source is
+    the backdrop glow), so its tokens must not silently return."""
     theme = ThemeProvider()
     for name in ("paper", "light", "dark"):
         theme.setTheme(name)
         material = theme.property("tokens")["material"]
-        assert float(material["glassSpecularPremium"]) > float(
-            material["glassSpecularBalanced"]
-        ), f"{name}: specular premium must be stronger"
+        assert "glassSpecularPremium" not in material, f"{name}: sheen returned"
+        assert "glassSpecularBalanced" not in material, f"{name}: sheen returned"
         assert float(material["glassEdgeLightPremium"]) > float(
             material["glassEdgeLightBalanced"]
         ), f"{name}: edge light premium must be stronger"
         assert float(material["glassInnerShadowPremium"]) > float(
             material["glassInnerShadowBalanced"]
         ), f"{name}: inner shadow premium must be stronger"
+        assert float(material["cardEdgeLight"]) > 0
+        assert float(material["cardInnerShadow"]) > 0
+        # Flat-style guardrail (user feedback: shadows should be faint, style
+        # flatter): inner shadows stay well under the old values everywhere.
+        assert float(material["cardInnerShadow"]) <= 0.06
+        assert float(material["glassInnerShadowPremium"]) <= 0.20
 
     # Light theme must be visibly brighter/more saturated than dark.
     theme.setTheme("light")
@@ -69,24 +74,8 @@ def test_liquid_glass_tokens_per_theme_and_tier() -> None:
     theme.setTheme("dark")
     dark = theme.property("tokens")["material"]
     assert float(light["glassSaturation"]) > float(dark["glassSaturation"])
-    assert float(light["glassSpecularPremium"]) > float(dark["glassSpecularPremium"])
     assert float(light["glassEdgeLightPremium"]) > float(dark["glassEdgeLightPremium"])
     assert float(light["glassSaturation"]) > 0
-    # Light theme must stay legible but visibly glassy on a bright canvas:
-    # the specular sheen needs real strength there, not just a token present.
-    assert float(light["glassSpecularPremium"]) >= 0.5
     # Light mode gets richer backdrop glows so the glass has color to transmit.
     assert float(light["backdropGlowWarm"]) > float(dark["backdropGlowWarm"])
     assert float(light["backdropGlowCool"]) > float(dark["backdropGlowCool"])
-    # Dark specular is capped so the sheen stays soft (user feedback: the
-    # diagonal highlight read as harsh at the previous 0.26).
-    assert float(dark["glassSpecularPremium"]) <= 0.20
-    # Every theme ships card edge-light tokens with positive strength.
-    for material in (light, dark):
-        assert float(material["cardEdgeLight"]) > 0
-        assert float(material["cardInnerShadow"]) > 0
-    # Flat-style guardrail (user feedback: shadows should be faint, style
-    # flatter): inner shadows stay well under the old values everywhere.
-    for material in (light, dark):
-        assert float(material["cardInnerShadow"]) <= 0.06
-        assert float(material["glassInnerShadowPremium"]) <= 0.20

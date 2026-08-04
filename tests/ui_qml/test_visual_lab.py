@@ -248,8 +248,8 @@ def test_quality_tiers_change_nav_sidebar_and_ai_glass(qtbot: QtBot) -> None:
 
 
 def test_liquid_glass_layers_follow_quality_tiers(qtbot: QtBot) -> None:
-    """iOS 26 layer stack (specular/edge light/inner shadow) is hidden in Safe,
-    active in Balanced, and stronger in Premium."""
+    """Edge light/inner shadow layers are hidden in Safe, active in Balanced,
+    and stronger in Premium (the specular sheen was removed per feedback)."""
     _, _, theme, window = _load_lab(qtbot)
     content = _content(window)
     acrylic = _find_item(content, "labAcrylicSurface")
@@ -259,14 +259,13 @@ def test_liquid_glass_layers_follow_quality_tiers(qtbot: QtBot) -> None:
 
     # Balanced: liquid layers active with positive strength.
     assert theme.property("visualQuality") == "balanced"
-    assert float(acrylic.property("specularOpacity")) > 0
     assert float(acrylic.property("edgeLightOpacity")) > 0
     assert float(acrylic.property("innerShadowOpacity")) > 0
     assert liquid_lights.property("visible") is True
 
     # Safe: all liquid layers hidden and strengths zero.
     theme.setVisualQuality("safe")
-    qtbot.waitUntil(lambda: float(acrylic.property("specularOpacity")) == 0.0)
+    qtbot.waitUntil(lambda: float(acrylic.property("edgeLightOpacity")) == 0.0)
     assert float(acrylic.property("edgeLightOpacity")) == 0.0
     assert float(acrylic.property("innerShadowOpacity")) == 0.0
     assert liquid_lights.property("visible") is False
@@ -274,22 +273,48 @@ def test_liquid_glass_layers_follow_quality_tiers(qtbot: QtBot) -> None:
     # Premium: strictly stronger than Balanced (tier separation must hold).
     theme.setVisualQuality("balanced")
     qtbot.wait(30)
-    balanced_specular = float(acrylic.property("specularOpacity"))
     balanced_edge = float(acrylic.property("edgeLightOpacity"))
     balanced_shadow = float(acrylic.property("innerShadowOpacity"))
     theme.setVisualQuality("premium")
     qtbot.waitUntil(
-        lambda: float(acrylic.property("specularOpacity")) > balanced_specular
+        lambda: float(acrylic.property("edgeLightOpacity")) > balanced_edge
     )
-    assert float(acrylic.property("edgeLightOpacity")) > balanced_edge
     assert float(acrylic.property("innerShadowOpacity")) > balanced_shadow
     assert liquid_lights.property("visible") is True
 
 
+def test_three_main_panels_share_unified_edge_material(qtbot: QtBot) -> None:
+    """Nav rail, chapter sidebar and AI panel share the same flat edge
+    treatment: no per-panel drop-shadow switch left in the shared surface
+    (user feedback: edges must be unified) and identical LiquidLights layer."""
+    _, _, _, window = _load_lab(qtbot)
+    content = _content(window)
+    acrylic = _find_item(content, "labAcrylicSurface")
+    nav = _find_item(content, "labNavRail")
+    sidebar = _find_item(content, "labChapterSidebar")
+    assert acrylic is not None and nav is not None and sidebar is not None
+
+    for item in (nav, sidebar, acrylic):
+        # The drop-shadow toggle was removed from the shared surface: every
+        # panel is flat and none can carry a shadow while others do not.
+        assert item.property("elevated") is None, item.objectName()
+        lights = _find_item(item, "liquidLights")
+        assert lights is not None, f"{item.objectName()}: liquidLights missing"
+        assert lights.property("visible") is True
+        assert lights.property("radius") == item.property("radius")
+        assert abs(
+            float(lights.property("edgeLightOpacity"))
+            - float(acrylic.property("edgeLightOpacity"))
+        ) < 1e-6, f"{item.objectName()}: edge light must match AI panel"
+        assert abs(
+            float(lights.property("innerShadowOpacity"))
+            - float(acrylic.property("innerShadowOpacity"))
+        ) < 1e-6, f"{item.objectName()}: inner shadow must match AI panel"
+
+
 def test_agent_cards_share_liquid_edge_lights(qtbot: QtBot) -> None:
     """Cards (TextDiff/ChangeSet/Form) share the edge light + inner shadow
-    language of the glass panels; Safe hides it and cards never draw the
-    specular sheen over content."""
+    language of the glass panels; Safe hides it entirely."""
     _, _, theme, window = _load_lab(qtbot)
     content = _content(window)
     for card_name in ("labDiffCard", "labChangeSetCard", "labFormCard"):
@@ -300,7 +325,6 @@ def test_agent_cards_share_liquid_edge_lights(qtbot: QtBot) -> None:
         assert lights.property("visible") is True
         assert float(lights.property("edgeLightOpacity")) > 0
         assert float(lights.property("innerShadowOpacity")) > 0
-        assert float(lights.property("specularOpacity")) == 0.0
 
     theme.setVisualQuality("safe")
     card = _find_item(content, "labDiffCard")

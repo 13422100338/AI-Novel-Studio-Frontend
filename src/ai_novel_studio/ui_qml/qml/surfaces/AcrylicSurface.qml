@@ -15,10 +15,11 @@ import "../effects"
 //   noise on top of the blur.
 // - iOS 26 "Liquid Glass" layer stack (Apple HIG materials; cupertino_liquid_glass
 //   0.6.x for Flutter; Floatica): blur + tint + saturation/vibrancy boost +
-//   diagonal specular highlight ("sheen") + top/left edge light + bottom/right
-//   inner shadow + noise grain. Light mode is matte & bright, dark mode is deep
-//   & contrasty; the specular/edge-light layers are what keep the material
-//   visible on a light canvas, where blur+tint alone wash out.
+//   top/left edge light + bottom/right inner shadow + noise grain. Light mode
+//   is matte & bright, dark mode is deep & contrasty.
+// - User feedback: no painted diagonal specular sheen; the light source is the
+//   BackdropLayer background glow. All glass panels share the same flat edge
+//   treatment (1px border + LiquidLights, no drop shadow).
 //
 // Scope: this component is used by the standalone Visual V0 lab page only.
 // The production shell keeps the simulated GlassSurface until the user
@@ -35,7 +36,6 @@ Item {
     required property Item sourceItem
 
     property real radius: Theme.tokens.radius.r12
-    property bool elevated: true
 
     // ---------------------------------------------------------------------
     // Behavior / test hooks. Safe tier degrades to a fully opaque surface
@@ -66,14 +66,10 @@ Item {
     property real saturation: parseFloat(Theme.tokens.material.glassSaturation)
     property real brightness: parseFloat(Theme.tokens.material.glassBrightness)
 
-    // Liquid Glass overlay strengths (iOS 26 research stack). Safe tier hides
-    // all overlay layers; Premium is deliberately stronger than Balanced so
-    // the tier separation stays visible in every theme, including light.
-    readonly property real specularOpacity:
-        Theme.visualQuality === "safe" ? 0.0
-            : Theme.visualQuality === "premium"
-                ? parseFloat(Theme.tokens.material.glassSpecularPremium)
-                : parseFloat(Theme.tokens.material.glassSpecularBalanced)
+    // Liquid Glass overlay strengths (iOS 26 research stack, specular sheen
+    // removed per user feedback). Safe tier hides all overlay layers; Premium
+    // is deliberately stronger than Balanced so the tier separation stays
+    // visible in every theme, including light.
     readonly property real edgeLightOpacity:
         Theme.visualQuality === "safe" ? 0.0
             : Theme.visualQuality === "premium"
@@ -117,19 +113,6 @@ Item {
             anchors.fill: parent
             radius: root.radius
         }
-    }
-
-    // Static soft shadow (Safe tier may keep static shadows; no blur/shader).
-    // Kept deliberately faint and thin so the material reads as flat rather
-    // than floating (user feedback: shadows should be subtle, style flatter).
-    Rectangle {
-        anchors.fill: parent
-        anchors.topMargin: 2
-        radius: root.radius + 2
-        color: "transparent"
-        border.width: root.elevated ? 3 : 2
-        border.color: Theme.tokens.elevation.shadowSoft
-        z: -1
     }
 
     // Captures the background layer area behind this panel. `enabled` keeps
@@ -202,17 +185,16 @@ Item {
             color: Theme.tokens.material.glassBorderShadow
         }
 
-        // Liquid Glass layer stack (iOS 26 research stack): diagonal specular
-        // sheen + top/left edge light + bottom/right inner shadow. Shared
-        // LiquidLights component paints them in one static Canvas clipped to
-        // the rounded rect, so nothing leaks past the corners.
+        // Liquid Glass layer stack (iOS 26 research stack): top/left edge
+        // light + bottom/right inner shadow. Shared LiquidLights component
+        // paints them in one static Canvas clipped to the rounded rect, so
+        // nothing leaks past the corners. No specular sheen (user feedback).
         LiquidLights {
             id: liquidLights
             objectName: "liquidLights"
             anchors.fill: parent
             anchors.margins: 1
             radius: root.radius
-            specularOpacity: root.specularOpacity
             edgeLightOpacity: root.edgeLightOpacity
             innerShadowOpacity: root.innerShadowOpacity
             visible: root.effectActive

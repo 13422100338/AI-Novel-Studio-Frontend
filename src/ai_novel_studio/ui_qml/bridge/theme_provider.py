@@ -22,13 +22,14 @@ def _material(theme_name: str) -> dict[str, str]:
     tokens below are consumed by the standalone Visual V0 lab page only, where
     the real-time Acrylic direction is evaluated before any global adoption.
 
-    The ``glassSpecular*`` / ``glassEdgeLight*`` / ``glassInnerShadow*`` tokens
-    implement the iOS 26 "Liquid Glass" layer stack (research-backed, see
-    AcrylicSurface.qml header): backdrop blur + tint + saturation/vibrancy
-    boost + diagonal specular highlight + top/left edge light + bottom/right
-    inner shadow + noise grain. Light mode is deliberately brighter and more
-    saturated (matte & bright) so the material still reads on a light canvas;
-    dark mode is deeper and more contrasty.
+    The ``glassEdgeLight*`` / ``glassInnerShadow*`` tokens implement the
+    iOS 26 "Liquid Glass" layer stack (research-backed, see AcrylicSurface.qml
+    header): backdrop blur + tint + saturation/vibrancy boost + top/left edge
+    light + bottom/right inner shadow + noise grain. The light source is the
+    BackdropLayer background glow (``backdropGlowWarm/Cool``), not a painted
+    specular sheen (removed per user feedback). Light mode is deliberately
+    brighter and more saturated (matte & bright) so the material still reads
+    on a light canvas; dark mode is deeper and more contrasty.
     """
     if theme_name == "paper":
         return {
@@ -50,8 +51,6 @@ def _material(theme_name: str) -> dict[str, str]:
             "glassTintOpacity": "0.62",
             "glassSaturation": "0.15",
             "glassBrightness": "0.03",
-            "glassSpecularBalanced": "0.24",
-            "glassSpecularPremium": "0.42",
             "glassEdgeLightBalanced": "0.20",
             "glassEdgeLightPremium": "0.34",
             "glassInnerShadowBalanced": "0.08",
@@ -61,8 +60,8 @@ def _material(theme_name: str) -> dict[str, str]:
             # Backdrop glow strength: light mode needs noticeably richer color
             # fields so the blur+tint stack has color to transmit (iOS Liquid
             # Glass only reads over visually rich backgrounds).
-            "backdropGlowWarm": "0.10",
-            "backdropGlowCool": "0.09",
+            "backdropGlowWarm": "0.14",
+            "backdropGlowCool": "0.12",
         }
     if theme_name == "dark":
         return {
@@ -81,11 +80,6 @@ def _material(theme_name: str) -> dict[str, str]:
             "glassTintOpacity": "0.62",
             "glassSaturation": "0.20",
             "glassBrightness": "0.08",
-            # Dark specular is deliberately softer: at high strength the
-            # sheen reads as a harsh diagonal stripe on a dark canvas (user
-            # feedback), so premium is capped low and the gradient is broad.
-            "glassSpecularBalanced": "0.09",
-            "glassSpecularPremium": "0.16",
             "glassEdgeLightBalanced": "0.16",
             "glassEdgeLightPremium": "0.26",
             "glassInnerShadowBalanced": "0.10",
@@ -113,17 +107,15 @@ def _material(theme_name: str) -> dict[str, str]:
         "glassTintOpacity": "0.62",
         "glassSaturation": "0.40",
         "glassBrightness": "0.05",
-            "glassSpecularBalanced": "0.34",
-            "glassSpecularPremium": "0.62",
-            "glassEdgeLightBalanced": "0.28",
-            "glassEdgeLightPremium": "0.46",
-            "glassInnerShadowBalanced": "0.09",
-            "glassInnerShadowPremium": "0.15",
-            "cardEdgeLight": "0.10",
-            "cardInnerShadow": "0.04",
-            "backdropGlowWarm": "0.22",
-            "backdropGlowCool": "0.19",
-        }
+        "glassEdgeLightBalanced": "0.28",
+        "glassEdgeLightPremium": "0.46",
+        "glassInnerShadowBalanced": "0.09",
+        "glassInnerShadowPremium": "0.15",
+        "cardEdgeLight": "0.10",
+        "cardInnerShadow": "0.04",
+        "backdropGlowWarm": "0.28",
+        "backdropGlowCool": "0.24",
+    }
 
 
 def _elevation() -> dict[str, str]:

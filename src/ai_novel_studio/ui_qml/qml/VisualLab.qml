@@ -156,7 +156,6 @@ ApplicationWindow {
                 Layout.fillHeight: true
                 sourceItem: backgroundLayer
                 radius: 0
-                elevated: false
 
                 ColumnLayout {
                     anchors.fill: parent
@@ -194,7 +193,6 @@ ApplicationWindow {
                 Layout.fillHeight: true
                 sourceItem: backgroundLayer
                 radius: 0
-                elevated: false
 
                 ColumnLayout {
                     anchors.fill: parent

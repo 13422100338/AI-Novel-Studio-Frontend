@@ -2,27 +2,26 @@ import QtQuick
 
 // Reusable iOS 26 "Liquid Glass" light layer (research-backed, see
 // AcrylicSurface.qml header and docs/frontend/2026-08-04-glassmorphism-ui-log.md
-// §12): diagonal specular sheen + top/left edge light + bottom/right inner
-// shadow, painted once into a static Canvas and clipped to the rounded rect
-// so no gradient ever leaks past the corners.
+// sections 12/14): top/left edge light + bottom/right inner shadow, painted
+// once into a static Canvas and clipped to the rounded rect so no gradient
+// ever leaks past the corners.
 //
-// The three strengths are independent so every surface can pick its own
-// material language:
-//   - AcrylicSurface (real-time glass panels) uses all three;
-//   - AgentCard and other content cards use only edge light + inner shadow
-//     (specularOpacity stays 0) so the "light falls from the top-left"
-//     language is shared without drawing a sheen over content.
-// Safe tier hides the whole layer by setting every strength to 0 (or the
-// caller sets visible: false).
+// Per user feedback the diagonal specular sheen is deliberately NOT part of
+// this component: the light source is the BackdropLayer background glow that
+// the glass blurs, not a highlight painted on the panel surface. Edge light +
+// inner shadow stay as a faint, shared "light falls from the top-left"
+// language across panels and cards.
+//
+// AgentCard and content cards use only edge light + inner shadow; Safe tier
+// hides the whole layer by setting every strength to 0 (or the caller sets
+// visible: false).
 Canvas {
     id: root
 
     property real radius: 12
-    property real specularOpacity: 0
     property real edgeLightOpacity: 0
     property real innerShadowOpacity: 0
 
-    onSpecularOpacityChanged: root.requestPaint()
     onEdgeLightOpacityChanged: root.requestPaint()
     onInnerShadowOpacityChanged: root.requestPaint()
     onRadiusChanged: root.requestPaint()
@@ -50,10 +49,9 @@ Canvas {
         ctx.reset()
         const w = root.width
         const h = root.height
-        const spec = root.specularOpacity
         const edge = root.edgeLightOpacity
         const inner = root.innerShadowOpacity
-        if (spec <= 0 && edge <= 0 && inner <= 0) {
+        if (edge <= 0 && inner <= 0) {
             return
         }
         const white = function (a) {
@@ -66,19 +64,6 @@ Canvas {
         ctx.save()
         root.roundedRectPath(ctx, 0, 0, w, h, root.radius)
         ctx.clip()
-
-        // Diagonal specular sheen. The gradient endpoint reaches past the
-        // bottom-right corner (w*1.15, h*0.75) and the stops are spread wide
-        // so the band is broad and soft instead of a hard diagonal stripe
-        // (user feedback: dark mode read as too harsh).
-        if (spec > 0) {
-            const sheen = ctx.createLinearGradient(0, 0, w * 1.15, h * 0.75)
-            sheen.addColorStop(0.0, white(spec))
-            sheen.addColorStop(0.30, white(spec * 0.55))
-            sheen.addColorStop(0.80, white(0))
-            ctx.fillStyle = sheen
-            ctx.fillRect(0, 0, w, h)
-        }
 
         // Top edge light: light gathering along the upper rim.
         if (edge > 0) {
