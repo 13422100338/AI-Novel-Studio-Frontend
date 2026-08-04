@@ -255,3 +255,18 @@ $env:PYTHONPATH="$tmp;C:\Users\钟子诚\.codex\worktrees\frontend-clean\src"
 （窗口后面透壁纸）的 DWM 调用本身成功，但视觉受洗白层掩盖影响，调薄后
 尚未确认，方向暂缓。恢复时从 §7 开始：先真机看 `f0c6dfa` 效果，不行再按
 §7.2 的候选方案（首选“不透明窗口 + 纯黑背景”）。
+
+## 10. 追加（2026-08-04）：路线纠偏已确认
+
+用户提供《AI_Novel_Studio_玻璃化UI路线纠偏与后续实施任务》，正式采纳：
+
+- **主路线**：不透明 Qt 窗口 + 应用内 `BackdropLayer` + 应用内
+  `AcrylicSurface` 面板 + 不透明 `PaperSurface` 正文；
+- **系统 Mica / Desktop Acrylic**：降级为可选实验，不再作为 Premium 核心
+  或正式 Shell 依赖；`windows_backdrop.py` / 诊断脚本 / 洗白层调参保留；
+- 质量档 Safe / Balanced / Premium 共享同一窗口合成模式与组件结构，
+  只改变模糊、Noise、阴影、动效强度；
+- 本轮已执行的最小动作：新增独立 `BackdropLayer.qml`（VisualLab 背景层
+  提炼）、VisualLab 标注“主路线：应用内 Acrylic；Mica：可选实验”、纠偏
+  文档入库 `docs/frontend/2026-08-04-glass-ui-course-correction.md`；
+- 正式 Shell / 后端 / WebEngine 全部未改动；完整恢复顺序见纠偏文档 §11。
