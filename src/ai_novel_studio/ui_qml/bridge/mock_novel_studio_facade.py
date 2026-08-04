@@ -218,6 +218,11 @@ class MockNovelStudioFacade(QObject):
         self._agent_timeline_model = AgentTimelineModel(self)
         self._agent_busy = False
         self._agent_step = 0
+        # Stream identity reservation: every Mock Agent turn gets one run_id and
+        # monotonic sequence numbers so real streaming events can be matched and
+        # stale chunks dropped after cancel/chapter switch (ideal-UI spec 10.4).
+        self._active_agent_run_id: str | None = None
+        self._agent_sequence = 0
         self._agent_timer: QTimer | None = None
         self._selection_reference: SelectionReferenceDto | None = None
         self._draft_view = "draft"
@@ -1092,9 +1097,18 @@ class MockNovelStudioFacade(QObject):
         normalized = text.strip()
         if not normalized or self._agent_busy:
             return
+        self._active_agent_run_id = str(uuid4())
+        self._agent_sequence = 0
         self._agent_timeline_model.append_item(
-            AgentTimelineItemDto(id=str(uuid4()), kind="user_text", text=normalized)
+            AgentTimelineItemDto(
+                id=str(uuid4()),
+                kind="user_text",
+                text=normalized,
+                run_id=self._active_agent_run_id,
+                sequence_number=self._agent_sequence,
+            )
         )
+        self._agent_sequence = 1
         self._agent_busy = True
         self._agent_step = 0
         self.agent_busy_changed.emit()
@@ -1107,13 +1121,17 @@ class MockNovelStudioFacade(QObject):
             return
         self._stop_agent_timer()
         self._agent_busy = False
+        run_id = self._active_agent_run_id or ""
         self._agent_timeline_model.append_item(
             AgentTimelineItemDto(
                 id=str(uuid4()),
                 kind="warning",
                 text="已停止 Mock 任务（真实 Agent 接入后支持中断恢复）",
+                run_id=run_id,
+                sequence_number=self._agent_sequence,
             )
         )
+        self._active_agent_run_id = None
         self.agent_busy_changed.emit()
         self.agent_timeline_changed.emit()
 
@@ -1185,11 +1203,21 @@ class MockNovelStudioFacade(QObject):
     def _advance_agent(self) -> None:
         if not self._agent_busy:
             return
+
+        def step(**fields: Any) -> AgentTimelineItemDto:
+            item = AgentTimelineItemDto(
+                id=str(uuid4()),
+                run_id=self._active_agent_run_id or "",
+                sequence_number=self._agent_sequence,
+                **fields,
+            )
+            self._agent_sequence += 1
+            return item
+
         steps: list[AgentTimelineItemDto] = []
         if self._agent_step == 0:
             steps.append(
-                AgentTimelineItemDto(
-                    id=str(uuid4()),
+                step(
                     kind="run_status",
                     label="正在读取当前章节和选区",
                     busy=True,
@@ -1199,8 +1227,7 @@ class MockNovelStudioFacade(QObject):
             )
         elif self._agent_step == 1:
             steps.append(
-                AgentTimelineItemDto(
-                    id=str(uuid4()),
+                step(
                     kind="tool_call",
                     label="read_selection",
                     text="读取正文选区与章节修订",
@@ -1210,8 +1237,7 @@ class MockNovelStudioFacade(QObject):
         elif self._agent_step == 2:
             ref = self._selection_reference
             steps.append(
-                AgentTimelineItemDto(
-                    id=str(uuid4()),
+                step(
                     kind="tool_result",
                     label="read_selection",
                     text=(
@@ -1223,8 +1249,7 @@ class MockNovelStudioFacade(QObject):
             )
         elif self._agent_step == 3:
             steps.append(
-                AgentTimelineItemDto(
-                    id=str(uuid4()),
+                step(
                     kind="run_status",
                     label="正在生成修改稿",
                     busy=False,
@@ -1239,8 +1264,7 @@ class MockNovelStudioFacade(QObject):
                 else self._body_text[:120]
             )
             steps.append(
-                AgentTimelineItemDto(
-                    id=str(uuid4()),
+                step(
                     kind="text_diff",
                     label="修改对比",
                     current_text=current,
@@ -1252,8 +1276,7 @@ class MockNovelStudioFacade(QObject):
             )
         elif self._agent_step == 5:
             steps.append(
-                AgentTimelineItemDto(
-                    id=str(uuid4()),
+                step(
                     kind="confirmation",
                     label="确认操作",
                     text="替换选区 / 再次修改 / 放弃",
@@ -1262,8 +1285,7 @@ class MockNovelStudioFacade(QObject):
             )
         elif self._agent_step == 6:
             steps.append(
-                AgentTimelineItemDto(
-                    id=str(uuid4()),
+                step(
                     kind="form_card",
                     label="补充设定",
                     text="请补充人物关系设定（Mock 表单，不写入项目）",
@@ -1274,8 +1296,7 @@ class MockNovelStudioFacade(QObject):
             )
         elif self._agent_step == 7:
             steps.append(
-                AgentTimelineItemDto(
-                    id=str(uuid4()),
+                step(
                     kind="change_set",
                     label="变更提案",
                     target="人物 · 林默",
@@ -1289,33 +1310,38 @@ class MockNovelStudioFacade(QObject):
             )
         else:
             self._agent_busy = False
+            self._active_agent_run_id = None
             self.agent_busy_changed.emit()
             self.agent_timeline_changed.emit()
             return
-        for step in steps:
-            self._agent_timeline_model.append_item(step)
+        for item in steps:
+            self._agent_timeline_model.append_item(item)
         self._agent_step += 1
         self.agent_timeline_changed.emit()
         if self._agent_step <= 7:
             self._schedule_agent_step()
         else:
             self._agent_busy = False
+            self._active_agent_run_id = None
             self.agent_busy_changed.emit()
 
     def _replace_agent_item(self, item_id: str, **changes: Any) -> None:
-        """Replace one timeline item with ``changes`` applied (state updates)."""
-        items = list(self._agent_timeline_model.items())
-        for index, item in enumerate(items):
-            if item.id == item_id:
-                items[index] = replace(item, **changes)
-                self._agent_timeline_model.set_items(items)
-                self.agent_timeline_changed.emit()
-                return
+        """Precisely update one timeline item via ``dataChanged`` (spec 18.6)."""
+        if self._agent_timeline_model.update_item(item_id, **changes):
+            self.agent_timeline_changed.emit()
 
     def _append_agent_text(self, text: str) -> None:
+        run_id = self._active_agent_run_id or ""
         self._agent_timeline_model.append_item(
-            AgentTimelineItemDto(id=str(uuid4()), kind="assistant_text", text=text)
+            AgentTimelineItemDto(
+                id=str(uuid4()),
+                kind="assistant_text",
+                text=text,
+                run_id=run_id,
+                sequence_number=self._agent_sequence,
+            )
         )
+        self._agent_sequence += 1
         self.agent_timeline_changed.emit()
 
     def _stop_agent_timer(self) -> None:

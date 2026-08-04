@@ -84,13 +84,8 @@ ApplicationWindow {
                 color: Theme.tokens.color.bgSidebar
                 clip: true
 
-                Behavior on Layout.preferredWidth {
-                    NumberAnimation {
-                        duration: Facade.reduceMotion ? 0 : Theme.tokens.duration.panel
-                        easing.type: Easing.OutCubic
-                    }
-                }
-
+                // Sidebar width switches in one step: animating the layout cell
+                // resizes the WebEngine editor every frame (ideal-UI spec 10.1).
                 ContextSidebar {
                     anchors.fill: parent
                 }
@@ -122,7 +117,6 @@ ApplicationWindow {
                 visible: window.useWebEngine
                 open: Facade.aiDrawerOpen
                 windowWidth: window.width
-                animateWidth: !window.useWebEngine
                 onClosed: Facade.toggleAiDrawer(false)
             }
 

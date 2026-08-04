@@ -19,6 +19,7 @@ def _palette(theme_name: str) -> dict[str, object]:
             "bgSurface": "#FBF8F0",
             "bgSidebar": "#EDE7DA",
             "bgEditor": "#FFFDF7",
+            "scrim": "#80000000",
             "textPrimary": "#2B2925",
             "textSecondary": "#6E6A61",
             "border": "#D8D0C0",
@@ -35,6 +36,7 @@ def _palette(theme_name: str) -> dict[str, object]:
             "bgSurface": "#292A2D",
             "bgSidebar": "#242527",
             "bgEditor": "#292A2D",
+            "scrim": "#80000000",
             "textPrimary": "#E8EAED",
             "textSecondary": "#AEB2B7",
             "border": "#3C4043",
@@ -51,6 +53,7 @@ def _palette(theme_name: str) -> dict[str, object]:
             "bgSurface": "#FFFFFF",
             "bgSidebar": "#EEF0F2",
             "bgEditor": "#FFFFFF",
+            "scrim": "#80000000",
             "textPrimary": "#202124",
             "textSecondary": "#6F7378",
             "border": "#E4E6E8",
@@ -72,7 +75,13 @@ def _palette(theme_name: str) -> dict[str, object]:
             "xxl": 32,
         },
         "radius": {"r8": 8, "r12": 12, "r16": 16},
-        "duration": {"fast": 120, "normal": 180, "panel": 220},
+        "duration": {
+            "fast": 120,
+            "normal": 180,
+            "panel": 220,
+            # Content fade for one-step geometry switches (ideal-UI spec 10.1).
+            "panelFade": 140,
+        },
         "font": {
             "ui": "Microsoft YaHei UI",
             "manuscript": "Microsoft YaHei",

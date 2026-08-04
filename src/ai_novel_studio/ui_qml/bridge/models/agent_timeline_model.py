@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import replace
+from typing import Any
 
 from PySide6.QtCore import (
     QAbstractListModel,
@@ -53,6 +55,21 @@ class AgentTimelineModel(QAbstractListModel):
         self.beginInsertRows(QModelIndex(), row, row)
         self._items.append(item)
         self.endInsertRows()
+
+    def update_item(self, item_id: str, **changes: Any) -> bool:
+        """Precisely update one timeline item and emit ``dataChanged`` once.
+
+        Streaming updates must not reset or rebuild the whole list: token
+        chunks merge in a buffer and land here on the existing row (ideal-UI
+        spec 10.3/10.5).
+        """
+        for row, item in enumerate(self._items):
+            if item.id == item_id:
+                self._items[row] = replace(item, **changes)
+                index = self.index(row)
+                self.dataChanged.emit(index, index)
+                return True
+        return False
 
     def clear(self) -> None:
         self.beginResetModel()

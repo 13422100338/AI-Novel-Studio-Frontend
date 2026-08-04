@@ -62,6 +62,32 @@ def test_agent_timeline_model_roles() -> None:
     assert model.roleNames()[ROLE_STATE] == b"state"
 
 
+def test_agent_timeline_model_update_item_is_precise() -> None:
+    """Spec 18.6: update one row via dataChanged, never reset the list."""
+    model = AgentTimelineModel()
+    model.append_item(
+        AgentTimelineItemDto(id="a1", kind="assistant_text", text="第一段")
+    )
+    model.append_item(
+        AgentTimelineItemDto(id="a2", kind="assistant_text", text="第二段")
+    )
+    emitted: list[tuple[int, int]] = []
+
+    def on_data_changed(top, bottom, _roles) -> None:
+        emitted.append((top.row(), bottom.row()))
+
+    model.dataChanged.connect(on_data_changed)
+
+    assert model.update_item("a1", text="第一段（更新）", status="RUNNING") is True
+    assert model.items()[0].text == "第一段（更新）"
+    assert model.items()[0].status == "RUNNING"
+    assert model.items()[1].text == "第二段"
+    assert emitted == [(0, 0)]
+
+    assert model.update_item("missing", text="x") is False
+    assert emitted == [(0, 0)]
+
+
 def test_mock_agent_emits_structured_timeline(qapp) -> None:
     facade = MockNovelStudioFacade()
 
@@ -109,6 +135,31 @@ def test_mock_agent_stop_keeps_partial_timeline(qapp) -> None:
     kinds = _kinds(facade)
     assert kinds[0] == "user_text"
     assert "warning" in kinds
+
+
+def test_mock_agent_items_carry_run_identity(qapp) -> None:
+    """Spec 10.4: each Mock turn has one run_id and monotonic sequences."""
+    facade = MockNovelStudioFacade()
+    model = facade.property("agentTimeline")
+
+    facade.startAgentTurn("第一轮")
+    _pump_until(qapp, facade, 5.0)
+    first_turn = model.items()
+    first_run_ids = {item.run_id for item in first_turn}
+    assert len(first_run_ids) == 1
+    first_run_id = first_run_ids.pop()
+    assert first_run_id
+    sequences = [item.sequence_number for item in first_turn]
+    assert sequences == sorted(sequences)
+    assert sequences[0] == 0
+
+    first_count = model.rowCount()
+    facade.startAgentTurn("第二轮")
+    _pump_until(qapp, facade, 5.0)
+    second_turn = model.items()[first_count:]
+    second_run_ids = {item.run_id for item in second_turn}
+    assert len(second_run_ids) == 1
+    assert second_run_ids.pop() != first_run_id
 
 
 def test_agent_item_actions_route_by_item_id_and_update_state() -> None:

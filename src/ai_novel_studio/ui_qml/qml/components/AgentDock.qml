@@ -4,6 +4,12 @@ import QtQuick.Layouts
 // Resizable, docked AI Assistant panel. It is a layout cell (never overlays the
 // WebEngine surface). Drag the left edge to resize, double-click to restore,
 // collapse to a slim expand tab.
+//
+// Geometry switches are always one-step (ideal-UI spec 10.1): an animated
+// Layout.preferredWidth resizes the WebEngineView frame by frame and repaints
+// black edge strips, so opening/closing snaps and the content fades in/out.
+// Dragging shows a preview line and commits the width on release instead of
+// resizing the layout every mouse move.
 Item {
     id: root
     objectName: "agentDock"
@@ -16,9 +22,13 @@ Item {
     property int windowWidth: 1440
     property int currentWidth: defaultWidth
     property bool reduceMotion: Facade.reduceMotion
-    // WebEngine mode must not animate Layout.preferredWidth: a frame-by-frame
-    // resize makes the editor repaint with black edge strips (C1.5).
-    property bool animateWidth: true
+    property bool dragging: false
+    // Test/drag-state hook: MouseArea copies the pointer position here and the
+    // no-argument functions below run the actual drag state machine.
+    property real dragPointerX: 0
+    property real dragStartX: 0
+    property bool dragMoved: false
+    property real dragPreviewX: 0
     signal closed()
 
     // UI state always follows the facade; QML never assigns `open` directly.
@@ -28,28 +38,85 @@ Item {
     Layout.maximumWidth: root.maxWidth
     clip: true
 
-    Behavior on Layout.preferredWidth {
-        enabled: root.animateWidth
-        NumberAnimation {
-            duration: root.reduceMotion ? 0 : Theme.tokens.duration.panel
-            easing.type: Easing.OutCubic
-        }
-    }
-
     Rectangle {
+        id: panelSurface
         anchors.fill: parent
-        visible: root.open
         color: Theme.tokens.color.bgSurface
         border.color: Theme.tokens.color.border
         border.width: 1
+        opacity: 0
+        scale: 0.97
+        visible: false
+        enabled: root.open
+        // The dock lives at the window's right edge: content arrives from and
+        // exits toward that edge (spatial consistency, apple-design §7).
+        transformOrigin: Qt.RightEdge
 
         CreativeAgentPanel {
             anchors.fill: parent
+        }
+
+        ParallelAnimation {
+            id: panelFadeIn
+            NumberAnimation {
+                target: panelSurface
+                property: "opacity"
+                to: 1
+                duration: root.reduceMotion ? 0 : Theme.tokens.duration.panelFade
+                easing.type: Easing.OutCubic
+            }
+            NumberAnimation {
+                target: panelSurface
+                property: "scale"
+                to: 1
+                duration: root.reduceMotion ? 0 : Theme.tokens.duration.panelFade
+                easing.type: Easing.OutCubic
+            }
+        }
+        ParallelAnimation {
+            id: panelFadeOut
+            NumberAnimation {
+                target: panelSurface
+                property: "opacity"
+                to: 0
+                // Exits snap faster than enters (asymmetric timing, emil-design-eng).
+                duration: root.reduceMotion ? 0 : Theme.tokens.duration.fast
+                easing.type: Easing.OutCubic
+            }
+            NumberAnimation {
+                target: panelSurface
+                property: "scale"
+                to: 0.97
+                duration: root.reduceMotion ? 0 : Theme.tokens.duration.fast
+                easing.type: Easing.OutCubic
+            }
+            onFinished: panelSurface.visible = false
+        }
+
+        function setOpen(open) {
+            if (open) {
+                panelFadeOut.stop()
+                panelSurface.visible = true
+                panelSurface.opacity = 0
+                panelSurface.scale = 0.97
+                panelFadeIn.start()
+            } else {
+                panelFadeIn.stop()
+                panelFadeOut.start()
+            }
+        }
+
+        Connections {
+            target: root
+            function onOpenChanged() {
+                panelSurface.setOpen(root.open)
+            }
         }
     }
 
     Rectangle {
         id: handle
+        objectName: "agentResizeHandle"
         width: 5
         anchors.top: parent.top
         anchors.bottom: parent.bottom
@@ -60,15 +127,34 @@ Item {
         MouseArea {
             anchors.fill: parent
             cursorShape: Qt.SizeHorCursor
-            onPositionChanged: function(mouse) {
-                const next = root.width - mouse.x
-                root.currentWidth = Math.max(
-                    root.minWidth,
-                    Math.min(root.maxWidth, next)
-                )
+            onPressed: {
+                root.dragPointerX = mouse.x
+                root.beginResizeDrag()
             }
+            onPositionChanged: {
+                root.dragPointerX = mouse.x
+                root.updateResizeDrag()
+            }
+            onReleased: {
+                root.dragPointerX = mouse.x
+                root.commitResizeDrag()
+            }
+            onCanceled: root.cancelResizeDrag()
             onDoubleClicked: root.resetWidth()
         }
+    }
+
+    // Width preview line: the dock keeps its current geometry while dragging
+    // and commits exactly once on release (ideal-UI spec 10.1).
+    Rectangle {
+        id: dragPreview
+        objectName: "agentDragPreview"
+        width: 2
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        x: root.dragPreviewX - 1
+        visible: root.dragging
+        color: Theme.tokens.color.accent
     }
 
     // Collapsed expand tab
@@ -105,5 +191,44 @@ Item {
 
     function resetWidth() {
         root.currentWidth = root.defaultWidth
+    }
+
+    function clampWidth(value) {
+        return Math.max(
+            root.minWidth,
+            Math.min(root.maxWidth, Math.round(value))
+        )
+    }
+
+    function beginResizeDrag() {
+        root.dragging = true
+        root.dragMoved = false
+        root.dragStartX = root.dragPointerX
+        root.dragPreviewX = Math.max(0, Math.min(root.width, root.dragPointerX))
+    }
+
+    function updateResizeDrag() {
+        if (!root.dragging) {
+            return
+        }
+        root.dragMoved = root.dragMoved ||
+            Math.abs(root.dragPointerX - root.dragStartX) > 3
+        root.dragPreviewX = Math.max(0, Math.min(root.width, root.dragPointerX))
+    }
+
+    function commitResizeDrag() {
+        if (!root.dragging) {
+            return
+        }
+        root.dragging = false
+        if (!root.dragMoved) {
+            // A simple click on the handle must not shrink the panel.
+            return
+        }
+        root.currentWidth = root.clampWidth(root.width - root.dragPointerX)
+    }
+
+    function cancelResizeDrag() {
+        root.dragging = false
     }
 }

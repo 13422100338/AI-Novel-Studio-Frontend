@@ -74,6 +74,10 @@ class AgentTimelineItemDto:
     id: str
     kind: str  # user_text|assistant_text|run_status|tool_call|tool_result|
     # choice_card|text_diff|confirmation|form_card|change_set|warning|error
+    # Stream identity: reserved so late events from an old run can be dropped
+    # after cancel/chapter switch (ideal-UI spec 10.4).
+    run_id: str = ""
+    sequence_number: int = 0
     text: str = ""
     label: str = ""
     busy: bool = False

@@ -19,7 +19,7 @@ Item {
     Rectangle {
         id: dim
         anchors.fill: parent
-        color: "#80000000"
+        color: Theme.tokens.color.scrim
         opacity: root.open ? 1 : 0
         visible: root.open
 

@@ -65,9 +65,18 @@ def test_webengine_view_has_explicit_background_color() -> None:
     assert "backgroundColor: Theme.tokens.color.bgEditor" in qml
 
 
-def test_agent_dock_disables_width_animation_in_webengine_mode() -> None:
+def test_agent_dock_geometry_switches_in_one_step() -> None:
+    """Ideal-UI spec 10.1: dock and sidebar never animate around WebEngine.
+
+    C1.5 gated the width animation off only in WebEngine mode; the ideal-UI
+    spec makes one-step geometry switches the rule for every mode, with the
+    panel content fading in/out instead and dragging committing on release.
+    """
     dock = _read(_DOCK_QML)
-    assert "property bool animateWidth: true" in dock
-    assert "enabled: root.animateWidth" in dock
+    assert "Behavior on Layout.preferredWidth" not in dock
+    assert "panelFadeIn" in dock and "panelFadeOut" in dock
+    assert "beginResizeDrag" in dock and "commitResizeDrag" in dock
+    assert "agentDragPreview" in dock
     app = _read(_APP_QML)
-    assert "animateWidth: !window.useWebEngine" in app
+    assert "animateWidth" not in app
+    assert "Behavior on Layout.preferredWidth" not in app

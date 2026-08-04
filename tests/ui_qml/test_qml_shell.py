@@ -332,11 +332,12 @@ def test_agent_dock_open_close_and_collapse(qtbot: QtBot) -> None:
     qtbot.waitUntil(lambda: dock.property("width") == 420)
 
 
-def test_agent_dock_webengine_mode_skips_width_animation(qtbot: QtBot) -> None:
-    """C1.5: WebEngine mode must resize the dock instantly.
+def test_agent_dock_geometry_switches_in_one_step(qtbot: QtBot) -> None:
+    """Ideal-UI 10.1: dock width snaps in every mode, content fades instead.
 
-    An animated Layout.preferredWidth resizes the WebEngineView frame by frame,
-    which repaints black edge strips next to the AI dock.
+    C1.5 gated the width animation off only for WebEngine; the ideal-UI spec
+    makes one-step geometry the rule for all modes so the editor never gets
+    resized frame by frame.
     """
     engine = QQmlApplicationEngine()
     _ACTIVE_ENGINES.append(engine)
@@ -360,7 +361,6 @@ def test_agent_dock_webengine_mode_skips_width_animation(qtbot: QtBot) -> None:
                     AgentDock {
                         open: Facade.aiDrawerOpen
                         windowWidth: 1440
-                        animateWidth: false
                         Layout.fillHeight: true
                     }
                 }
@@ -375,14 +375,92 @@ def test_agent_dock_webengine_mode_skips_width_animation(qtbot: QtBot) -> None:
     qtbot.waitUntil(lambda: root.width() > 0)
     dock = _find_quick_item(root.contentItem(), "agentDock")
     assert dock is not None
-    assert dock.property("animateWidth") is False
     assert dock.property("width") == 34
 
     facade.toggleAiDrawer(True)
-    # One event-loop pass: with the Behavior disabled the width must already be
-    # the default 420 (an animated dock would still be near 34 here).
+    # One event-loop pass: the width must already be the default 420.
     qtbot.wait(10)
     assert dock.property("width") == 420
+
+
+def test_agent_dock_drag_previews_and_commits_on_release(qtbot: QtBot) -> None:
+    """Ideal-UI 10.1: dragging shows a preview line and commits once."""
+    engine = QQmlApplicationEngine()
+    _ACTIVE_ENGINES.append(engine)
+    engine.addImportPath(str(Path(app_qml_path()).parent))
+    facade = MockNovelStudioFacade()
+    theme = ThemeProvider()
+    register_frontend_types(engine, facade, theme)
+    engine.loadData(
+        QByteArray(
+            b"""
+            import QtQuick
+            import QtQuick.Controls
+            import QtQuick.Layouts
+            import "components"
+            ApplicationWindow {
+                width: 1440
+                height: 900
+                visible: true
+                RowLayout {
+                    anchors.fill: parent
+                    AgentDock {
+                        open: Facade.aiDrawerOpen
+                        windowWidth: 1440
+                        Layout.fillHeight: true
+                    }
+                }
+            }
+            """
+        ),
+        QUrl.fromLocalFile(str(Path(app_qml_path()).parent / "dock-drag-harness.qml")),
+    )
+    root = engine.rootObjects()[0]
+    assert root is not None
+    root.show()
+    qtbot.waitUntil(lambda: root.width() > 0)
+    dock = _find_quick_item(root.contentItem(), "agentDock")
+    preview = _find_quick_item(root.contentItem(), "agentDragPreview")
+    assert dock is not None and preview is not None
+    facade.toggleAiDrawer(True)
+    qtbot.waitUntil(lambda: dock.property("width") == 420)
+
+    # Simple click on the handle must not change the width.
+    dock.setProperty("dragPointerX", 2.5)
+    QMetaObject.invokeMethod(dock, "beginResizeDrag")
+    QMetaObject.invokeMethod(dock, "commitResizeDrag")
+    assert dock.property("dragging") is False
+    assert dock.property("width") == 420
+
+    # Real drag: the dock keeps its width while dragging; only a preview line
+    # follows the pointer, and the width commits exactly once on release.
+    dock.setProperty("dragPointerX", 2.5)
+    QMetaObject.invokeMethod(dock, "beginResizeDrag")
+    qtbot.waitUntil(lambda: dock.property("dragging") is True)
+    qtbot.waitUntil(lambda: preview.property("visible") is True)
+
+    dock.setProperty("dragPointerX", -80.0)
+    QMetaObject.invokeMethod(dock, "updateResizeDrag")
+    qtbot.waitUntil(lambda: dock.property("dragPreviewX") == 0.0)
+    assert dock.property("width") == 420, "dock must not resize while dragging"
+
+    QMetaObject.invokeMethod(dock, "commitResizeDrag")
+    assert dock.property("dragging") is False
+    qtbot.waitUntil(lambda: dock.property("width") == 500)
+    qtbot.waitUntil(lambda: preview.property("visible") is False)
+
+    # Release inside the bounds: width derives from the pointer position.
+    QMetaObject.invokeMethod(dock, "resetWidth")
+    qtbot.waitUntil(lambda: dock.property("width") == 420)
+    dock.setProperty("dragPointerX", 2.5)
+    QMetaObject.invokeMethod(dock, "beginResizeDrag")
+    dock.setProperty("dragPointerX", 60.0)
+    QMetaObject.invokeMethod(dock, "updateResizeDrag")
+    QMetaObject.invokeMethod(dock, "commitResizeDrag")
+    qtbot.waitUntil(
+        lambda: dock.property("width") == 360,
+        timeout=5000,
+    )
 
 
 def test_timeline_cards_stay_within_content_width(qtbot: QtBot) -> None:

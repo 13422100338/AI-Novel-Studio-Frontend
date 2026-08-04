@@ -11,6 +11,8 @@ def test_default_theme_is_paper() -> None:
     assert tokens["spacing"]["lg"] == 16
     assert tokens["radius"]["r16"] == 16
     assert tokens["duration"]["panel"] == 220
+    assert tokens["duration"]["panelFade"] == 140
+    assert tokens["color"]["scrim"] == "#80000000"
 
 
 def test_set_theme_valid_and_invalid() -> None:
