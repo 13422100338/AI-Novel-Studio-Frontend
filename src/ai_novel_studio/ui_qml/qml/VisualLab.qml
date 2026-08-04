@@ -58,6 +58,23 @@ ApplicationWindow {
         }
     }
 
+    // Resize repaint guard: Qt Quick can leave newly exposed areas unpainted
+    // after a window resize on some Windows GPU/driver combinations (seen as
+    // black L-shaped bands at the right/bottom edges). Forcing a scene-graph
+    // update after the resize settles repaints those areas.
+    Timer {
+        id: resizeRepaintTimer
+        interval: 60
+        repeat: false
+        onTriggered: {
+            if (root.visible) {
+                root.update()
+            }
+        }
+    }
+    onWidthChanged: resizeRepaintTimer.restart()
+    onHeightChanged: resizeRepaintTimer.restart()
+
     // ---------------------------------------------------------------------
     // App-controlled backdrop (glass course correction, recommended route):
     // opaque window + in-app BackdropLayer + Acrylic panels above. The
