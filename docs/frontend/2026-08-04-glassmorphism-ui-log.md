@@ -595,6 +595,46 @@ reduceMotion 降级、无黑块；工具条关闭无动画（高频动作）。
   `visual-v0-rework-scrollbar-dark.png`；范本列 0 黑像素，右缘 thumb 区域
   有渲染（饱和像素 paper 1578 / dark 970）。
 
+## 20. 追加（2026-08-04）：正式 Shell 玻璃整合
+
+用户确认“现在可以试着整合到前端”。本轮把 VisualLab 验证过的玻璃路线
+（BackdropLayer + AcrylicSurface + LiquidLights）接入正式 `App.qml`，
+保持最小改动、正文/WebEngine 不透明、Safe 可回退。
+
+### 20.1 改动
+
+- `App.qml`：新增 `import "surfaces"`；窗口最底层加 `BackdropLayer`
+  （objectName `f1BackgroundLayer`，`washEnabled: false`，窗口仍不透明）；
+  侧栏宿主 `sidebarHost` 从实色 Rectangle 换成 `AcrylicSurface`
+  （`sourceItem: backgroundLayer`，radius 0，折叠仍一步切换，遵守
+  ideal-UI spec 10.1）；NavigationRail 与 AgentDock 传入
+  `backdropSource: backgroundLayer`；中央工作区加 objectName
+  `workspaceHost`（保持 `bgCanvas` 实色，正文 WebEngine 不透明）。
+- `NavigationRail.qml`：新增 `property Item backdropSource: null`；传入时
+  使用 AcrylicSurface（radius 0），否则保留原实色背景（向后兼容）。
+- `AgentDock.qml`：新增 `backdropSource`；`panelSurface` 在传入时为半透明
+  玻璃底（premium 0.86 / 其它 0.94，类型化 glassColor 避免 Qt.rgba
+  undefined 黑块坑），并挂载 LiquidLights（card 级边缘光/内阴影）；
+  宽度切换仍一步完成，面板 fade/scale 进入动画不受影响。
+
+### 20.2 测试与验证
+
+- 新增 2 个正式 Shell 测试：玻璃整合（BackdropLayer 覆盖全窗、导航/侧栏/
+  Dock 共用同一背景源、中央工作区不透明、Safe 档降级为不透明）与
+  sidebar 折叠一步切换。
+- 前端 pytest 178 passed / 35 skipped；ruff 通过；mypy（项目配置）通过。
+- 正式 shell 截图（offscreen，c1-shell-paper/light/dark 等 7 张）重新生成：
+  像素确认侧栏左右色差（paper 238→245、dark 51→46）即背景光晕透出——
+  玻璃生效；正文区保持实色。
+
+### 20.3 遗留项
+
+- offscreen 软件渲染下，侧栏 `projectPath`（ElideMiddle）区域左右两端有
+  少量纯黑像素（基线已有，非本轮引入，真机需复核）；不影响功能，列入
+  后续清理。
+- 正式 Shell 尚无质量档 UI（沿用 ThemeProvider 默认 balanced）；后续可在
+  设置页暴露 Safe/Balanced/Premium。
+
 ## 16. 追加（2026-08-04）：Header 玻璃化、控制条边缘统一、资源门禁
 
 “做下一波”收尾：实验页剩余大容器统一玻璃语言，并补齐资源/几何门禁测试。

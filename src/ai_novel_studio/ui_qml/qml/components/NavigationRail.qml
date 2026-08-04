@@ -1,13 +1,28 @@
 import QtQuick
 import QtQuick.Layouts
+import "../surfaces"
 
 Item {
     id: root
 
     implicitWidth: 56
 
+    // Production-shell glass integration: when the caller passes the window's
+    // BackdropLayer, the rail becomes an Acrylic surface (same material
+    // language as VisualLab). Without it the rail keeps its original opaque
+    // background, so standalone uses are unaffected.
+    property Item backdropSource: null
+
+    AcrylicSurface {
+        anchors.fill: parent
+        visible: root.backdropSource !== null
+        sourceItem: root.backdropSource
+        radius: 0
+        objectName: "navRailGlass"
+    }
     Rectangle {
         anchors.fill: parent
+        visible: root.backdropSource === null
         color: Theme.tokens.color.bgSurface
         border.color: Theme.tokens.color.border
         border.width: 1

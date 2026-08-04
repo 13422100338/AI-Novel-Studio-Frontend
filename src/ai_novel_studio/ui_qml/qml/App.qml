@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "components"
 import "pages"
+import "surfaces"
 
 ApplicationWindow {
     id: window
@@ -62,6 +63,15 @@ ApplicationWindow {
         return "空闲"
     }
 
+    // App-controlled backdrop (glass-UI route): the window stays opaque and
+    // this themed layer is the blur source for the Acrylic columns above.
+    BackdropLayer {
+        id: backgroundLayer
+        objectName: "f1BackgroundLayer"
+        anchors.fill: parent
+        washEnabled: false
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
@@ -74,14 +84,19 @@ ApplicationWindow {
             NavigationRail {
                 Layout.preferredWidth: 56
                 Layout.fillHeight: true
+                backdropSource: backgroundLayer
             }
 
-            Rectangle {
+            // Sidebar host is glass over the same backdrop (unified material
+            // language). Width switches stay one-step: animating the layout
+            // cell resizes the WebEngine editor frame by frame.
+            AcrylicSurface {
                 id: sidebarHost
                 objectName: "sidebarHost"
                 Layout.preferredWidth: window.sidebarVisible ? 280 : 0
                 Layout.fillHeight: true
-                color: Theme.tokens.color.bgSidebar
+                sourceItem: backgroundLayer
+                radius: 0
                 clip: true
 
                 // Sidebar width switches in one step: animating the layout cell
@@ -92,6 +107,7 @@ ApplicationWindow {
             }
 
             Rectangle {
+                objectName: "workspaceHost"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 color: Theme.tokens.color.bgCanvas
@@ -117,6 +133,7 @@ ApplicationWindow {
                 visible: window.useWebEngine
                 open: Facade.aiDrawerOpen
                 windowWidth: window.width
+                backdropSource: backgroundLayer
                 onClosed: Facade.toggleAiDrawer(false)
             }
 

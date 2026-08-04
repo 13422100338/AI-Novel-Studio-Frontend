@@ -114,6 +114,65 @@ def test_shell_loads_and_exposes_core_objects(qtbot: QtBot) -> None:
         assert window.findChild(object, name) is not None, f"missing {name}"
 
 
+def test_shell_glass_integration_covers_chrome_keeps_workspace_opaque(
+    qtbot: QtBot,
+) -> None:
+    """Production shell now uses the VisualLab glass route: the window
+    backdrop, nav rail, sidebar host and AI dock share one BackdropLayer,
+    while the central workspace (and WebEngine editor) stays opaque."""
+    engine, _, theme = _load_engine(qtbot)
+    window = engine.rootObjects()[0]
+    content = window.contentItem()
+
+    backdrop = _find_quick_item(content, "f1BackgroundLayer")
+    assert backdrop is not None
+    assert abs(backdrop.width() - float(window.width())) < 1
+    assert abs(backdrop.height() - float(window.height())) < 1
+
+    sidebar = _find_quick_item(content, "sidebarHost")
+    rail_glass = _find_quick_item(content, "navRailGlass")
+    dock = _find_quick_item(content, "agentDock")
+    workspace = _find_quick_item(content, "workspaceHost")
+    assert sidebar is not None and rail_glass is not None
+    assert dock is not None and workspace is not None
+
+    # All chrome columns blur the same backdrop layer.
+    assert sidebar.property("sourceItem").objectName() == "f1BackgroundLayer"
+    assert rail_glass.property("sourceItem").objectName() == "f1BackgroundLayer"
+    assert dock.property("backdropSource").objectName() == "f1BackgroundLayer"
+    assert sidebar.property("blurEnabled") is True
+
+    # Central workspace stays opaque and untouched by the glass route.
+    assert workspace.property("color").alpha() == 255
+
+    # Safe tier degrades the chrome to opaque without breaking layout.
+    theme.setVisualQuality("safe")
+    qtbot.waitUntil(lambda: sidebar.property("blurEnabled") is False)
+    assert rail_glass.property("blurEnabled") is False
+    assert sidebar.property("fillColor").alpha() == 255
+
+
+def test_shell_glass_integration_sidebar_toggle_stays_one_step(
+    qtbot: QtBot,
+) -> None:
+    """Glass sidebar keeps the one-step width switch (ideal-UI spec 10.1:
+    never animate the layout cell that resizes the WebEngine editor)."""
+    engine, _, _ = _load_engine(qtbot)
+    window = engine.rootObjects()[0]
+    content = window.contentItem()
+    sidebar = _find_quick_item(content, "sidebarHost")
+    assert sidebar is not None
+
+    toggle = window.findChild(object, "sidebarToggle")
+    assert toggle is not None
+    QMetaObject.invokeMethod(toggle, "clicked")
+    qtbot.wait(40)
+    assert abs(float(sidebar.property("width"))) < 1
+    QMetaObject.invokeMethod(toggle, "clicked")
+    qtbot.wait(40)
+    assert float(sidebar.property("width")) > 100
+
+
 def test_typing_marks_editor_dirty_and_save_clears(qtbot: QtBot) -> None:
     engine, facade, _ = _load_engine(qtbot)
     window = engine.rootObjects()[0]

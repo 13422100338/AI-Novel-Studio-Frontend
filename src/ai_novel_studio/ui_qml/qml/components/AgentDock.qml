@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import "../surfaces"
 
 // Resizable, docked AI Assistant panel. It is a layout cell (never overlays the
 // WebEngine surface). Drag the left edge to resize, double-click to restore,
@@ -23,6 +24,13 @@ Item {
     property int currentWidth: defaultWidth
     property bool reduceMotion: Facade.reduceMotion
     property bool dragging: false
+    // Production-shell glass integration: window BackdropLayer (same source as
+    // the other columns). When null the panel keeps its original opaque fill,
+    // so standalone harnesses and non-shell uses are unaffected.
+    property Item backdropSource: null
+    // Theme tokens are strings; type them first so .r/.g/.b resolve
+    // (Qt.rgba(undefined) silently paints black, see DragSheet §18.2).
+    readonly property color glassColor: Theme.tokens.color.bgSurface
     // Test/drag-state hook: MouseArea copies the pointer position here and the
     // no-argument functions below run the actual drag state machine.
     property real dragPointerX: 0
@@ -41,7 +49,14 @@ Item {
     Rectangle {
         id: panelSurface
         anchors.fill: parent
-        color: Theme.tokens.color.bgSurface
+        color: root.backdropSource !== null
+            ? Qt.rgba(
+                root.glassColor.r,
+                root.glassColor.g,
+                root.glassColor.b,
+                Theme.visualQuality === "premium" ? 0.86 : 0.94
+            )
+            : Theme.tokens.color.bgSurface
         border.color: Theme.tokens.color.border
         border.width: 1
         opacity: 0
@@ -54,6 +69,16 @@ Item {
 
         CreativeAgentPanel {
             anchors.fill: parent
+        }
+
+        // Shared edge language with cards/panels (edge light + inner shadow).
+        LiquidLights {
+            objectName: "agentDockLiquidLights"
+            anchors.fill: parent
+            radius: 0
+            visible: root.backdropSource !== null
+            edgeLightOpacity: parseFloat(Theme.tokens.material.cardEdgeLight)
+            innerShadowOpacity: parseFloat(Theme.tokens.material.cardInnerShadow)
         }
 
         ParallelAnimation {
