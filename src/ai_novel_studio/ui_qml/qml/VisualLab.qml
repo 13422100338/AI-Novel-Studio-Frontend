@@ -86,6 +86,25 @@ ApplicationWindow {
             }
         }
 
+        // --- Experiment control strip: folds down between the header and the
+        // body so the four-column workspace shifts instead of being covered
+        // (fixes the previous drawer covering the AI panel and being hard to
+        // dismiss).
+        ExperimentControlPanel {
+            id: controlPanel
+            Layout.fillWidth: true
+            Layout.preferredHeight: root.experimentOpen ? controlPanel.implicitHeight : 0
+            clip: true
+            visible: root.experimentOpen
+            open: root.experimentOpen
+            debugBackdrop: root.debugBackdrop
+            debugSourceRect: root.debugSourceRect
+            debugBlurRegion: root.debugBlurRegion
+            micaExperiment: root.systemBackdrop
+            onClosed: root.experimentOpen = false
+            onMicaChanged: root.systemBackdrop = enabled
+        }
+
         // --- Four-column body (mirrors the target workspace structure).
         RowLayout {
             id: bodyLayout
@@ -337,6 +356,26 @@ ApplicationWindow {
                     visible: root.micaActive
                 }
 
+                // Debug overlays (inside the AI panel host so coordinates are
+                // relative and the outlines never overlap other columns).
+                Rectangle {
+                    visible: root.debugSourceRect
+                    anchors.fill: parent
+                    color: "transparent"
+                    border.color: "#E53935"
+                    border.width: 1
+                    opacity: 0.85
+                }
+                Rectangle {
+                    visible: root.debugBlurRegion
+                    anchors.fill: parent
+                    anchors.margins: -2
+                    color: "transparent"
+                    border.color: "#43A047"
+                    border.width: 1
+                    opacity: 0.7
+                }
+
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 16
@@ -461,49 +500,6 @@ ApplicationWindow {
                     }
                 }
             }
-        }
-    }
-
-    // --- Experiment control drawer (all debug controls live here).
-    ExperimentControlPanel {
-        anchors.fill: parent
-        open: root.experimentOpen
-        debugBackdrop: root.debugBackdrop
-        debugSourceRect: root.debugSourceRect
-        debugBlurRegion: root.debugBlurRegion
-        micaExperiment: root.systemBackdrop
-        onClosed: root.experimentOpen = false
-    }
-
-    // --- Debug overlays (optional, from the experiment drawer).
-    // "背景原图": hide the surfaces so the raw BackdropLayer shows through.
-    // "sourceRect / blur 区域": draw thin indicator outlines around the AI
-    // panel (the Acrylic capture region) so capture geometry can be checked.
-    Item {
-        anchors.fill: parent
-        visible: root.debugSourceRect || root.debugBlurRegion
-
-        Rectangle {
-            visible: root.debugSourceRect
-            x: aiPanelHost.x
-            y: aiPanelHost.y
-            width: aiPanelHost.width
-            height: aiPanelHost.height
-            color: "transparent"
-            border.color: "#E53935"
-            border.width: 1
-            opacity: 0.85
-        }
-        Rectangle {
-            visible: root.debugBlurRegion
-            x: aiPanelHost.x - 2
-            y: aiPanelHost.y - 2
-            width: aiPanelHost.width + 4
-            height: aiPanelHost.height + 4
-            color: "transparent"
-            border.color: "#43A047"
-            border.width: 1
-            opacity: 0.7
         }
     }
 }

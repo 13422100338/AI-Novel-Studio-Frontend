@@ -257,6 +257,50 @@ def test_experiment_panel_opens_and_closes(qtbot: QtBot) -> None:
     qtbot.waitUntil(lambda: panel.property("open") is False)
 
 
+def test_experiment_panel_never_covers_ai_panel(qtbot: QtBot) -> None:
+    """Regression: the control strip must not overlap the AI assistant panel."""
+    _, _, _, window = _load_lab(qtbot)
+    content = _content(window)
+    open_button = _find_item(content, "experimentOpenButton")
+    panel = _find_item(content, "experimentControlPanel")
+    ai = _find_item(content, "labAcrylicSurface")
+    assert open_button is not None and panel is not None and ai is not None
+
+    # Map both items into the window-content coordinate system.
+    ai_origin = ai.mapToItem(content, 0, 0)
+    ai_rect = (
+        ai_origin.x(),
+        ai_origin.y(),
+        ai_origin.x() + ai.width(),
+        ai_origin.y() + ai.height(),
+    )
+
+    QMetaObject.invokeMethod(open_button, "clicked")
+    qtbot.waitUntil(lambda: panel.property("open") is True)
+    qtbot.wait(60)
+
+    # After opening, both the strip and the AI panel are laid out; re-map both.
+    ai_origin2 = ai.mapToItem(content, 0, 0)
+    ai_rect = (
+        ai_origin2.x(),
+        ai_origin2.y(),
+        ai_origin2.x() + ai.width(),
+        ai_origin2.y() + ai.height(),
+    )
+    panel_origin2 = panel.mapToItem(content, 0, 0)
+    panel_rect = (
+        panel_origin2.x(),
+        panel_origin2.y(),
+        panel_origin2.x() + panel.width(),
+        panel_origin2.y() + panel.height(),
+    )
+    overlap_x = max(0, min(ai_rect[2], panel_rect[2]) - max(ai_rect[0], panel_rect[0]))
+    overlap_y = max(0, min(ai_rect[3], panel_rect[3]) - max(ai_rect[1], panel_rect[1]))
+    assert overlap_x * overlap_y == 0, (
+        f"control panel overlaps AI panel: ai={ai_rect} panel={panel_rect}"
+    )
+
+
 def test_experiment_panel_controls_switch_theme_and_quality(qtbot: QtBot) -> None:
     _, _, theme, window = _load_lab(qtbot)
     content = _content(window)
