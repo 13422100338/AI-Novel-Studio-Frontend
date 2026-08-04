@@ -214,7 +214,7 @@ def test_system_backdrop_quality_tiers_are_distinct(qtbot: QtBot) -> None:
     assert theme.property("visualQuality") == "balanced"
     assert window.property("micaActive") is True
     assert window.property("color").alpha() == 0
-    assert abs(float(window.property("backdropWashAlpha")) - 0.80) < 0.01
+    assert abs(float(window.property("backdropWashAlpha")) - 0.32) < 0.01
     assert chip.property("value") == "Mica"
 
     # Safe: fully opaque window, wallpaper hidden, in-app Acrylic path back.
@@ -230,7 +230,7 @@ def test_system_backdrop_quality_tiers_are_distinct(qtbot: QtBot) -> None:
     theme.setVisualQuality("premium")
     qtbot.waitUntil(lambda: window.property("micaActive") is True)
     assert window.property("color").alpha() == 0
-    assert abs(float(window.property("backdropWashAlpha")) - 0.66) < 0.01
+    assert abs(float(window.property("backdropWashAlpha")) - 0.18) < 0.01
     assert glass.property("visible") is True
     assert chip.property("value") == "Desktop Acrylic"
 

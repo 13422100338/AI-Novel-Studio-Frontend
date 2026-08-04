@@ -118,6 +118,19 @@
 - 顶栏新增「系统背板」状态芯片，实时显示 `Safe 关闭 / Mica / Desktop Acrylic`，
   用于确认 DWM 调用是否真的生效（offscreen 路径自动隐藏）。
 
+真机诊断（2026-08-04，Win11 + 壁纸为 Windows 聚焦风景图）：
+
+- `DwmSetWindowAttribute(DWMWA_SYSTEMBACKDROP_TYPE)` 返回 **S_OK (0x0)**，
+  系统背板调用一直成功；
+- Qt 6.11 透明 QQuickWindow 的 ExStyle 为 `0x100`，**未设置 WS_EX_LAYERED**，
+  不存在 layered 冲突；
+- 因此此前“一团灰、换档只变深浅”的根因是：底板上叠加的 0.8 不透明度
+  主题洗白层把 Mica 完全盖住（Safe 档没有该层所以正常）。
+
+修复：洗白层大幅调淡——Balanced `wash 0.80 → 0.32`，Premium `0.66 → 0.18`，
+让壁纸的模糊色彩真正透出；Premium 使用更薄的洗白层以拉开与 Balanced 的
+档位差异。
+
 ## 4. 验证
 
 ```text

@@ -33,8 +33,12 @@ ApplicationWindow {
         root.systemBackdrop && Theme.visualQuality !== "safe"
     // Premium uses Desktop Acrylic (brighter); let slightly more wallpaper
     // through than Balanced so the quality tiers read differently.
+    // Keep the wash light: a heavy wash (0.8) was observed to hide the DWM
+    // backdrop entirely, leaving a flat gray pane (verified on a real Win11
+    // machine: DwmSetWindowAttribute returns S_OK and the window is not
+    // layered, so the gray was our own wash, not a failed API call).
     readonly property real backdropWashAlpha:
-        Theme.visualQuality === "premium" ? 0.66 : 0.80
+        Theme.visualQuality === "premium" ? 0.18 : 0.32
     color: root.micaActive ? "transparent" : Theme.tokens.color.bgCanvas
     font.family: Theme.tokens.font.ui
 
