@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import QMetaObject, QObject, QUrl, Slot
 from PySide6.QtGui import QColor
-from PySide6.QtQml import QQmlApplicationEngine, QQmlExpression
+from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickItem, QQuickWindow
 from pytestqt.qtbot import QtBot
 
@@ -119,10 +119,10 @@ def test_visual_lab_loads_four_column_workspace(qtbot: QtBot) -> None:
         "experimentOpenButton",
         "experimentControlPanel",
         "experimentCloseButton",
-        "labDragSheetButton",
-        "dragSheetTemplate",
-        "dragSheetGrabber",
-        "dragSheetCloseButton",
+        "labScrollbarTemplate",
+        "glassScrollbar",
+        "glassScrollbarThumb",
+        "scrollbarManuscript",
         "labMicaToggle",
         "labDebugBackdropToggle",
         "labDebugSourceRectToggle",
@@ -641,131 +641,106 @@ def test_debug_overlay_toggles_propagate_to_window(qtbot: QtBot) -> None:
     qtbot.waitUntil(lambda: window.property("debugBlurRegion") is True)
 
 
-def _open_drag_sheet(window: QQuickWindow) -> None:
-    button = _find_item(window.contentItem(), "labDragSheetButton")
-    assert button is not None
-    QMetaObject.invokeMethod(button, "clicked")
-
-
-def test_drag_sheet_opens_collapsed_and_closes(qtbot: QtBot) -> None:
-    """The draggable panel opens collapsed (only the grabber + header row is
-    exposed) and closes via button or Escape."""
+def test_scrollbar_template_loads_at_right_edge(qtbot: QtBot) -> None:
+    """The vertical scrollbar template is the right-most column of the lab
+    (window right edge), with a scrollable manuscript and a glass bar."""
     _, _, _, window = _load_lab(qtbot)
+    qtbot.wait(250)  # offscreen layout: Flickable contentHeight settles late
     content = _content(window)
-    sheet = _find_item(content, "dragSheetTemplate")
-    close_button = _find_item(content, "dragSheetCloseButton")
-    grabber = _find_item(content, "dragSheetGrabber")
-    assert sheet is not None and close_button is not None and grabber is not None
-    assert sheet.property("visible") is False
+    template = _find_item(content, "labScrollbarTemplate")
+    bar = _find_item(content, "glassScrollbar")
+    thumb = _find_item(content, "glassScrollbarThumb")
+    manuscript = _find_item(content, "scrollbarManuscript")
+    assert template is not None and bar is not None
+    assert thumb is not None and manuscript is not None
 
-    _open_drag_sheet(window)
-    qtbot.waitUntil(lambda: sheet.property("visible") is True)
-    # Defaults to collapsed: progress 0 -> translate down by travel.
-    assert abs(float(sheet.property("progress"))) < 0.001
-    assert abs(float(sheet.property("collapsedY")) - float(sheet.property("travel"))) < 0.001
-
-    QMetaObject.invokeMethod(close_button, "clicked")
-    qtbot.waitUntil(lambda: sheet.property("visible") is False)
+    # Right-most column: its right edge touches the window edge.
+    assert abs(template.x() + template.width() - float(window.width())) < 1
+    # The manuscript has enough content to overflow -> bar visible.
+    assert bool(bar.property("visibleWhen")) is True
+    assert float(thumb.property("height")) > 0
 
 
-def test_drag_sheet_progress_maps_translate_one_to_one(qtbot: QtBot) -> None:
-    """progress 0/0.5/1 maps 1:1 to the panel translate (y = travel*(1-p)),
-    which is exactly how much of the panel stays visible."""
-    _, facade, _, window = _load_lab(qtbot)
-    facade.setReduceMotion(True)  # deterministic: no spring mid-flight
-    _open_drag_sheet(window)
-    qtbot.wait(80)
-    sheet = _find_item(_content(window), "dragSheetTemplate")
-    assert sheet is not None
+def test_scrollbar_thumb_scales_with_content(qtbot: QtBot) -> None:
+    """Thumb height reflects the viewport/content ratio and stays within the
+    track; the bar is hidden when there is nothing to scroll."""
+    _, _, _, window = _load_lab(qtbot)
+    qtbot.wait(250)
+    content = _content(window)
+    bar = _find_item(content, "glassScrollbar")
+    thumb = _find_item(content, "glassScrollbarThumb")
+    manuscript = _find_item(content, "scrollbarManuscript")
+    assert bar is not None and thumb is not None and manuscript is not None
 
-    travel = float(sheet.property("travel"))
-    for progress, expected_y in ((0.0, travel), (0.5, travel / 2), (1.0, 0.0)):
-        sheet.setProperty("progress", progress)
+    track = float(bar.property("trackHeight"))
+    content_h = float(manuscript.property("contentHeight"))
+    viewport_h = float(manuscript.property("height"))
+    assert content_h > viewport_h + 1, "mock manuscript must overflow"
+    expected = max(24, track * viewport_h / content_h)
+    assert abs(float(thumb.property("height")) - expected) < 1.5
+
+    # Shrink content below the viewport: bar hides.
+    manuscript.setProperty("contentHeight", viewport_h - 10)
+    qtbot.wait(20)
+    assert bool(bar.property("visibleWhen")) is False
+
+
+def test_scrollbar_content_y_maps_to_thumb_one_to_one(qtbot: QtBot) -> None:
+    """contentY 0/mid/max maps 1:1 to the thumb position (normalized)."""
+    _, _, _, window = _load_lab(qtbot)
+    qtbot.wait(250)
+    content = _content(window)
+    bar = _find_item(content, "glassScrollbar")
+    manuscript = _find_item(content, "scrollbarManuscript")
+    assert bar is not None and manuscript is not None
+
+    content_h = float(manuscript.property("contentHeight"))
+    viewport_h = float(manuscript.property("height"))
+    max_y = content_h - viewport_h
+
+    for fraction in (0.0, 0.37, 1.0):
+        manuscript.setProperty("contentY", max_y * fraction)
         qtbot.wait(20)
-        assert abs(float(sheet.property("translateY")) - expected_y) < 0.5, (
-            f"progress {progress}: translate {sheet.property('translateY')} != {expected_y}"
+        assert abs(float(bar.property("normalized")) - fraction) < 0.01, (
+            f"contentY fraction {fraction}: normalized {bar.property('normalized')}"
         )
 
 
-def test_drag_sheet_set_progress_clamps(qtbot: QtBot) -> None:
-    """Programmatic progress is clamped into 0..1 through the setProgress path
-    (glass-UI doc §12.3: functionality must not depend on visuals)."""
-    _, _, _, window = _load_lab(qtbot)
-    _open_drag_sheet(window)
-    qtbot.wait(80)
-    sheet = _find_item(_content(window), "dragSheetTemplate")
-    assert sheet is not None
-
-    sheet.setProperty("progress", 2.5)
-    qtbot.wait(20)
-    assert abs(float(sheet.property("progress")) - 1.0) < 0.001
-    sheet.setProperty("progress", -1.0)
-    qtbot.wait(20)
-    assert abs(float(sheet.property("progress"))) < 0.001
-
-
-def test_drag_sheet_snap_target_logic(qtbot: QtBot) -> None:
-    """Release snaps to the nearest tier, boosted by fling direction:
-    upward fling jumps a tier, downward fling drops one."""
-    engine, _, _, window = _load_lab(qtbot)
-    _open_drag_sheet(window)
-    qtbot.wait(80)
-    sheet = _find_item(_content(window), "dragSheetTemplate")
-    assert sheet is not None
-
-    def snap(progress: float, velocity: float) -> float:
-        expression = QQmlExpression(
-            engine.rootContext(),
-            sheet,
-            f"snapTarget({progress}, {velocity})",
-        )
-        result = expression.evaluate()
-        assert result is not None and result[0] is not None, (
-            f"snapTarget evaluation failed: {result}"
-        )
-        return float(result[0])
-
-    # Nearest tier without fling.
-    assert abs(snap(0.1, 0.0) - 0.0) < 0.001
-    assert abs(snap(0.4, 0.0) - 0.5) < 0.001
-    assert abs(snap(0.9, 0.0) - 1.0) < 0.001
-    # Upward fling (negative velocity) jumps to the next tier.
-    assert abs(snap(0.1, -150.0) - 0.5) < 0.001
-    assert abs(snap(0.4, -150.0) - 1.0) < 0.001
-    # Downward fling (positive velocity) drops a tier.
-    assert abs(snap(0.9, 150.0) - 0.5) < 0.001
-    assert abs(snap(0.6, 150.0) - 0.0) < 0.001
-
-
-def test_drag_sheet_respects_reduce_motion(qtbot: QtBot) -> None:
-    """Facade.reduceMotion disables the snap spring so the panel stays crisp
-    and static (apple-design §14)."""
+def test_scrollbar_respects_reduce_motion(qtbot: QtBot) -> None:
+    """reduceMotion disables the hover fade so the bar stays crisp
+    (apple-design 14)."""
     _, facade, _, window = _load_lab(qtbot)
-    _open_drag_sheet(window)
-    qtbot.wait(80)
-    sheet = _find_item(_content(window), "dragSheetTemplate")
-    assert sheet is not None
+    bar = _find_item(_content(window), "glassScrollbar")
+    assert bar is not None
 
-    assert bool(sheet.property("springEnabled")) is True
+    assert bool(bar.property("springEnabled")) is True
     facade.setReduceMotion(True)
-    qtbot.waitUntil(lambda: bool(sheet.property("springEnabled")) is False)
+    qtbot.waitUntil(lambda: bool(bar.property("springEnabled")) is False)
 
 
-def test_drag_sheet_shares_unified_edge_lights(qtbot: QtBot) -> None:
-    """The draggable panel carries the same faint edge light + inner shadow as
-    cards so every container keeps the shared material language."""
-    _, _, _, window = _load_lab(qtbot)
-    _open_drag_sheet(window)
-    qtbot.wait(80)
-    sheet = _find_item(_content(window), "dragSheetTemplate")
-    assert sheet is not None
-    lights = _find_item(sheet, "dragSheetLiquidLights")
-    assert lights is not None
-    assert lights.property("visible") is True
-    assert float(lights.property("edgeLightOpacity")) > 0
-    assert float(lights.property("innerShadowOpacity")) > 0
+def test_scrollbar_tier_styling_stays_functional(qtbot: QtBot) -> None:
+    """Safe/Balanced/Premium keep the same geometry and functionality; only
+    the thumb material changes (glass-UI doc 12.3)."""
+    _, _, theme, window = _load_lab(qtbot)
+    qtbot.wait(250)
+    content = _content(window)
+    bar = _find_item(content, "glassScrollbar")
+    manuscript = _find_item(content, "scrollbarManuscript")
+    assert bar is not None and manuscript is not None
 
-
+    geometry = (
+        float(bar.property("thumbHeight")),
+        float(bar.property("thumbY")),
+    )
+    for quality in ("safe", "balanced", "premium"):
+        theme.setVisualQuality(quality)
+        qtbot.wait(40)
+        manuscript.setProperty("contentY", 0)
+        qtbot.wait(20)
+        assert (
+            float(bar.property("thumbHeight")),
+            float(bar.property("thumbY")),
+        ) == geometry, f"geometry changed at {quality}"
 def test_streaming_glow_degrades_with_reduce_motion(qtbot: QtBot) -> None:
     _, facade, _, window = _load_lab(qtbot)
     glow = _find_item(_content(window), "labStreamingGlow")

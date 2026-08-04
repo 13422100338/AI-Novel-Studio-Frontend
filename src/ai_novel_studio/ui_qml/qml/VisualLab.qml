@@ -40,7 +40,6 @@ ApplicationWindow {
     font.family: Theme.tokens.font.ui
 
     property bool experimentOpen: false
-    property bool dragSheetOpen: false
     property bool debugBackdrop: false
     property bool debugSourceRect: false
     property bool debugBlurRegion: false
@@ -107,13 +106,6 @@ ApplicationWindow {
                     text: "实验控制"
                     ghost: true
                     onClicked: root.experimentOpen = true
-                }
-                AppButton {
-                    objectName: "labDragSheetButton"
-                    text: "拖拽面板范本"
-                    ghost: true
-                    selected: root.dragSheetOpen
-                    onClicked: root.dragSheetOpen = !root.dragSheetOpen
                 }
             }
         }
@@ -536,22 +528,18 @@ ApplicationWindow {
                     }
                 }
             }
+
+            // 5. Scrollbar template: the vertical scrollbar at the far right
+            // edge of the window (user clarification). Glass panel with a
+            // long mock manuscript and a right-edge GlassScrollbar.
+            ScrollbarTemplate {
+                objectName: "labScrollbarTemplate"
+                Layout.preferredWidth: 230
+                Layout.fillHeight: true
+                sourceItem: backgroundLayer
+            }
         }
 
     }
 
-    // --- DragSheet: the "上下划动窗口的条" template. Floating over the
-    // workspace bottom (iOS sheet style), draggable via its grabber. It is
-    // declared after the ColumnLayout so it stacks on top; collapsed by
-    // default shows only the header row.
-    DragSheet {
-        id: dragSheet
-        objectName: "dragSheetTemplate"
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        visible: root.dragSheetOpen
-        title: "上下划动窗口 · DragSheet 范本"
-        onClosed: root.dragSheetOpen = false
-    }
 }

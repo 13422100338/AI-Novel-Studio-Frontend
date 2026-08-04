@@ -32,7 +32,7 @@ os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from PySide6.QtCore import QMetaObject, QUrl  # noqa: E402
+from PySide6.QtCore import QUrl  # noqa: E402
 from PySide6.QtGui import QGuiApplication, QImage  # noqa: E402
 from PySide6.QtQml import QQmlApplicationEngine  # noqa: E402
 from PySide6.QtQuick import QQuickItem, QQuickWindow  # noqa: E402
@@ -144,24 +144,19 @@ def main() -> int:
     capture("light", "premium", "visual-v0-rework-light-premium.png")
     capture("paper", "balanced", "visual-v0-rework-resized.png", size=(1280, 800))
 
-    # DragSheet showcase: the "上下划动窗口的条" template (bottom sheet with a
-    # grabber). Captures both the expanded and the collapsed (grabber-only)
-    # states.
-    def capture_drag_sheet(
-        theme_name: str,
-        filename: str,
-        progress: float,
-    ) -> None:
+    # Scrollbar template: the vertical scrollbar at the far right edge of the
+    # window (user clarification). Always visible in the lab, so no button is
+    # needed; scroll the manuscript a bit so the thumb is visible mid-track.
+    def capture_scrollbar(theme_name: str, filename: str) -> None:
         theme.setTheme(theme_name)
         theme.setVisualQuality("premium")
-        button = _find_item(root.contentItem(), "labDragSheetButton")
-        assert button is not None, f"{filename}: drag sheet button missing"
-        sheet = _find_item(root.contentItem(), "dragSheetTemplate")
-        if sheet is None or sheet.property("visible") is not True:
-            QMetaObject.invokeMethod(button, "clicked")
+        manuscript = _find_item(root.contentItem(), "scrollbarManuscript")
+        assert manuscript is not None, f"{filename}: manuscript missing"
+        manuscript.setProperty(
+            "contentY",
+            (manuscript.property("contentHeight") - manuscript.property("height")) * 0.4,
+        )
         _pump(app, 8)
-        sheet.setProperty("progress", progress)
-        _pump(app, 16)  # snap spring settles
         assert _backdrop_covers(root), f"{filename}: backdrop never covered window"
         image = root.grabWindow()
         _assert_clean_window(root, image, filename)
@@ -169,8 +164,8 @@ def main() -> int:
         assert image.save(str(path)), f"failed to save {path}"
         print(f"saved {path}")
 
-    capture_drag_sheet("paper", "visual-v0-rework-drag-sheet.png", 1.0)
-    capture_drag_sheet("dark", "visual-v0-rework-drag-sheet-dark.png", 0.0)
+    capture_scrollbar("paper", "visual-v0-rework-scrollbar.png")
+    capture_scrollbar("dark", "visual-v0-rework-scrollbar-dark.png")
 
     engine.deleteLater()
     return 0

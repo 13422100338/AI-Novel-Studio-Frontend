@@ -540,6 +540,61 @@ reduceMotion 降级、无黑块；工具条关闭无动画（高频动作）。
 - 真机 windowed 截图：展开（paper）与收起（dark）两张，底部区域 0 黑像素；
   grabber 行亮度正常（paper 亮 / dark 灰条可见）。
 
+## 19. 追加（2026-08-04）：再次纠正——垂直滚动条范本（窗口最右侧）
+
+用户第三次澄清：要的是**滚动条**（vertical scrollbar，一般在窗口最右侧），
+不是横向滑块（§17），也不是底部可拖面板（§18）。本轮：
+
+### 19.1 结构改动
+
+- 删除 `DragSheet.qml`（并补删上一轮遗留未提交的 `GlassSlider.qml`、
+  `SliderTemplateDock.qml` 删除状态）；qmldir 注册 `GlassScrollbar` 与
+  `ScrollbarTemplate`。
+- 新增 `GlassScrollbar.qml`：垂直滚动条（宽 14px），
+  - thumb 高度 = 视口/内容比例，位置 = contentY 归一化映射，双向往 1:1
+    同步（contentY→thumb 绑定、拖 thumb→写回 contentY，含抓取偏移）；
+  - 点击轨道按方向翻一屏（不跳远）；拖过边界由 Flickable StopAtBounds 收住；
+  - hover 只做 opacity 0.55→1.0（120ms，仅合成属性，reduceMotion 时 0）；
+  - 档位：Safe 实色 thumb 无轨道 / Balanced 半透明玻璃 thumb + 淡轨道 /
+    Premium 渐变 thumb + 顶部 1px 高光（light catching the material）；
+  - 内容不超高时整条隐藏（功能完整但无可滚动内容）。
+- 新增 `ScrollbarTemplate.qml`：窗口最右侧固定列（230px），玻璃面板内放
+  18 段长 Mock 文稿（Flickable），右缘贴 GlassScrollbar。
+- `VisualLab.qml`：四栏之后追加第五列 `labScrollbarTemplate`（最右贴窗缘），
+  删除 DragSheet 按钮/属性/声明。
+- 截图脚本：删除 drag-sheet 两张，新增 scrollbar 两张（paper/dark，滚动到
+  40% 让 thumb 可见）。
+
+### 19.2 实现中处理的真实坑
+
+- offscreen/software 下 Flickable `contentHeight` 布局延迟（早期为 0，
+  thumb 高度一度 56 万像素）：测试等待 250ms 后再断言；组件本身在
+  contentHeight=0 时整条隐藏（§12.3 功能不依赖视觉）。
+- `springEnabled` 守卫改为 `typeof Facade !== "undefined" && Facade ? ...`，
+  消除 QML null 访问告警。
+- PySide6 把 QML bool 读回为 float：断言统一 `bool(...)`。
+
+### 19.3 review-animations 自审
+
+| Before（朴素基线） | After（本轮实现） | Why |
+| --- | --- | --- |
+| thumb 位置硬编码 | contentY 归一化 1:1 绑定 | 直接操作：内容与 thumb 同步（apple §2） |
+| hover 突现/突隐 | opacity 0.55→1.0，120ms | 只在合成属性上做短淡入，<300ms |
+| 点击轨道跳任意位置 | 按方向翻一屏 | 可预测、不丢失上下文 |
+| 直接读 Facade | typeof+truthy 守卫 | 避免 null 访问告警与静默禁用 |
+
+**Verdict: Approve**——拖动 1:1、动效仅 opacity 且 ≤120ms、reduceMotion 降级、
+无 scale(0)/ease-in、内容不超高自动隐藏。
+
+### 19.4 验证
+
+- 前端 pytest 176 passed / 35 skipped（5 个滚动条测试：右缘位置、thumb 比例
+  与隐藏、contentY↔thumb 1:1、reduceMotion、档位几何不变）；ruff 通过；
+  mypy（项目配置）通过。
+- 真机 windowed 截图：`visual-v0-rework-scrollbar.png` /
+  `visual-v0-rework-scrollbar-dark.png`；范本列 0 黑像素，右缘 thumb 区域
+  有渲染（饱和像素 paper 1578 / dark 970）。
+
 ## 16. 追加（2026-08-04）：Header 玻璃化、控制条边缘统一、资源门禁
 
 “做下一波”收尾：实验页剩余大容器统一玻璃语言，并补齐资源/几何门禁测试。
