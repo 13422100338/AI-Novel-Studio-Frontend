@@ -27,7 +27,11 @@ ApplicationWindow {
     font.family: Theme.tokens.font.ui
 
     // Helper: theme color with a low alpha (background decorations only).
-    function tint(color, alpha) {
+    // Typed `color` parameter is required: Theme.tokens.* values are strings
+    // ("#RRGGBB"); an untyped parameter would leave color.r/g/b undefined and
+    // Qt.rgba() would silently produce black (observed as black bands/blocks
+    // in the lab backdrop).
+    function tint(color: color, alpha: real) {
         return Qt.rgba(color.r, color.g, color.b, alpha)
     }
 
@@ -67,7 +71,7 @@ ApplicationWindow {
                 }
                 GradientStop {
                     position: 0.6
-                    color: Qt.lighter(Theme.tokens.color.bgCanvas, 1.04)
+                    color: root.tint(Qt.lighter(Theme.tokens.color.bgCanvas, 1.04), 1)
                 }
                 GradientStop {
                     position: 1.0
