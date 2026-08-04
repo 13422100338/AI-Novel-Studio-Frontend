@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import QMetaObject, QUrl
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickItem, QQuickWindow
 from pytestqt.qtbot import QtBot
@@ -76,6 +76,11 @@ def test_visual_lab_loads_all_demo_surfaces(qtbot: QtBot) -> None:
         "labFormCard",
         "labStreamingGlow",
         "labStaticGlow",
+        "labTheme-paper",
+        "labTheme-dark",
+        "labQuality-safe",
+        "labQuality-balanced",
+        "labQuality-premium",
     ):
         item = _find_item(content, name)
         assert item is not None, f"missing {name}"
@@ -126,3 +131,23 @@ def test_visual_quality_cycles_safe_balanced_premium(qtbot: QtBot) -> None:
     theme.setVisualQuality("unknown")
     # Invalid quality values fall back to the Balanced default.
     assert theme.property("visualQuality") == "balanced"
+
+
+def test_visual_quality_segment_buttons_switch_quality(qtbot: QtBot) -> None:
+    _, _, theme, window = _load_lab(qtbot)
+    content = _content(window)
+
+    premium = _find_item(content, "labQuality-premium")
+    assert premium is not None
+    QMetaObject.invokeMethod(premium, "clicked")
+    qtbot.waitUntil(lambda: theme.property("visualQuality") == "premium")
+
+    safe = _find_item(content, "labQuality-safe")
+    assert safe is not None
+    QMetaObject.invokeMethod(safe, "clicked")
+    qtbot.waitUntil(lambda: theme.property("visualQuality") == "safe")
+
+    dark = _find_item(content, "labTheme-dark")
+    assert dark is not None
+    QMetaObject.invokeMethod(dark, "clicked")
+    qtbot.waitUntil(lambda: theme.property("themeName") == "dark")

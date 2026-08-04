@@ -64,16 +64,43 @@ ApplicationWindow {
             Item {
                 Layout.fillWidth: true
             }
-            AppButton {
-                objectName: "labThemeButton"
-                text: "主题：" + Theme.themeName
-                onClicked: Theme.setTheme(Theme.nextThemeName())
+
+            // 主题：三段式切换（paper / light / dark）
+            RowLayout {
+                spacing: 4
+                Text {
+                    text: "主题"
+                    font.pixelSize: 11
+                    color: Theme.tokens.color.textSecondary
+                }
+                Repeater {
+                    model: ["paper", "light", "dark"]
+                    AppButton {
+                        objectName: "labTheme-" + modelData
+                        text: modelData
+                        selected: Theme.themeName === modelData
+                        onClicked: Theme.setTheme(modelData)
+                    }
+                }
             }
-            AppButton {
-                objectName: "labQualityButton"
-                text: "质量：" + Theme.visualQuality
-                primary: true
-                onClicked: Theme.setVisualQuality(Theme.nextVisualQuality())
+
+            // 质量档：三段式切换（Safe / Balanced / Premium）
+            RowLayout {
+                spacing: 4
+                Text {
+                    text: "质量"
+                    font.pixelSize: 11
+                    color: Theme.tokens.color.textSecondary
+                }
+                Repeater {
+                    model: ["safe", "balanced", "premium"]
+                    AppButton {
+                        objectName: "labQuality-" + modelData
+                        text: modelData
+                        primary: Theme.visualQuality === modelData
+                        onClicked: Theme.setVisualQuality(modelData)
+                    }
+                }
             }
         }
 
