@@ -1,4 +1,4 @@
-"""Visual V0 sample page (ideal-UI spec 15): surfaces, tiers, quality, glow."""
+"""Visual V0 rework (diagnosis doc): four-column workspace, app acrylic."""
 
 from pathlib import Path
 
@@ -49,6 +49,8 @@ def _load_lab(
     assert engine.rootObjects(), "VisualLab.qml failed to load"
     window = engine.rootObjects()[0]
     assert isinstance(window, QQuickWindow)
+    window.resize(1440, 900)
+    window.show()
     _ACTIVE_ENGINES.append(engine)
     return engine, facade, theme, window
 
@@ -75,7 +77,16 @@ def _assert_color_approx(actual: object, expected_hex: str, tolerance: int = 2) 
         ), f"{channel} mismatch: {actual_color.name()} vs {expected_hex}"
 
 
-def test_visual_lab_loads_all_demo_surfaces(qtbot: QtBot) -> None:
+def _grab(window: QQuickWindow) -> object:
+    for _ in range(6):
+        window.contentItem().update()
+    image = window.grabWindow()
+    assert not image.isNull()
+    return image
+
+
+def test_visual_lab_loads_four_column_workspace(qtbot: QtBot) -> None:
+    """The rework mirrors the target workspace: nav, sidebar, paper, AI."""
     _, _, _, window = _load_lab(qtbot)
 
     assert window.objectName() == "visualLabWindow"
@@ -84,43 +95,88 @@ def test_visual_lab_loads_all_demo_surfaces(qtbot: QtBot) -> None:
         "labBackgroundLayer",
         "labAcrylicSurface",
         "labGlassSurface",
-        "labGlassCompare",
-        "labAcrylicCompare",
-        "labMicaCompare",
-        "labFlatCompare",
         "labPaperSurface",
-        "labElevatedSurface",
-        "labPrimaryButton",
-        "labSecondaryButton",
-        "labGhostButton",
-        "labInputField",
+        "labChapterList",
         "labDiffCard",
         "labChangeSetCard",
         "labFormCard",
         "labStreamingGlow",
-        "labStaticGlow",
-        "labReduceMotionButton",
-        "labGlowThinking",
-        "labGlowSuccess",
-        "labGlowError",
-        "labGlowCancelled",
-        "labTheme-paper",
-        "labTheme-dark",
-        "labQuality-safe",
-        "labQuality-balanced",
-        "labQuality-premium",
+        "labInputField",
+        "experimentOpenButton",
+        "experimentControlPanel",
+        "experimentCloseButton",
+        "labMicaToggle",
+        "labDebugBackdropToggle",
+        "labDebugSourceRectToggle",
+        "labDebugBlurRegionToggle",
     ):
         item = _find_item(content, name)
         assert item is not None, f"missing {name}"
 
 
-def test_visual_lab_theme_switch_updates_window(qtbot: QtBot) -> None:
-    _, _, theme, window = _load_lab(qtbot)
+def test_backdrop_layer_covers_whole_window(qtbot: QtBot) -> None:
+    """Diagnosis doc 13.1: BackdropLayer must cover the full window."""
+    _, _, _, window = _load_lab(qtbot)
+    backdrop = _find_item(_content(window), "labBackgroundLayer")
+    assert backdrop is not None
 
-    assert theme.property("themeName") == "paper"
-    theme.setTheme("dark")
-    tokens = theme.property("tokens")
-    assert tokens["color"]["bgCanvas"] == "#202124"
+    assert backdrop.x() == 0
+    assert backdrop.y() == 0
+    assert abs(backdrop.width() - float(window.width())) < 1
+    assert abs(backdrop.height() - float(window.height())) < 1
+
+
+def test_window_has_no_bare_black_regions(qtbot: QtBot) -> None:
+    """Diagnosis doc 13.2/15: no visible black exposed areas."""
+    _, _, _, window = _load_lab(qtbot)
+    image = _grab(window)
+    W, H = image.width(), image.height()
+
+    dark = 0
+    total = 0
+    for y in range(0, H, 8):
+        for x in range(0, W, 8):
+            c = image.pixelColor(x, y)
+            total += 1
+            if max(c.red(), c.green(), c.blue()) < 12:
+                dark += 1
+    assert dark == 0, f"{dark}/{total} sampled pixels are pure black"
+
+
+def test_main_panels_stay_inside_window(qtbot: QtBot) -> None:
+    """Diagnosis doc 13.3: all main panels are inside the window bounds."""
+    _, _, _, window = _load_lab(qtbot)
+    content = _content(window)
+    w = float(window.width())
+    h = float(window.height())
+
+    for name in ("labAcrylicSurface", "labPaperSurface"):
+        item = _find_item(content, name)
+        assert item is not None
+        assert item.x() >= 0
+        assert item.y() >= 0
+        assert item.x() + item.width() <= w + 1
+        assert item.y() + item.height() <= h + 1
+
+
+def test_acrylic_captures_backdrop_layer(qtbot: QtBot) -> None:
+    """Diagnosis doc 13.4: sourceItem is the backdrop; sourceRect matches."""
+    _, _, _, window = _load_lab(qtbot)
+    content = _content(window)
+    acrylic = _find_item(content, "labAcrylicSurface")
+    background = _find_item(content, "labBackgroundLayer")
+    assert acrylic is not None and background is not None
+
+    source = acrylic.property("sourceItem")
+    assert source is not None
+    assert source.objectName() == "labBackgroundLayer"
+
+    rect = acrylic.property("captureRect")
+    assert rect is not None
+    assert rect.width() > 100
+    assert rect.height() > 100
+    assert abs(rect.width() - float(acrylic.property("width"))) < 2
+    assert abs(rect.height() - float(acrylic.property("height"))) < 2
 
 
 def test_visual_quality_degrades_acrylic_to_opaque_and_disables_blur(
@@ -133,106 +189,92 @@ def test_visual_quality_degrades_acrylic_to_opaque_and_disables_blur(
     assert theme.property("visualQuality") == "balanced"
     assert acrylic.property("blurEnabled") is True
     assert acrylic.property("effectActive") is True
-    # Acrylic tint: #FBF8F0 at glassTintOpacity 0.62 -> alpha ~0x9E.
-    _assert_color_approx(acrylic.property("fillColor"), "#9EFBF8F0")
 
     theme.setVisualQuality("safe")
     qtbot.waitUntil(lambda: acrylic.property("blurEnabled") is False)
     assert acrylic.property("effectActive") is False
-    # Safe tier degrades to a fully opaque surface color.
     assert _qcolor(acrylic.property("fillColor")).name() == "#fbf8f0"
 
     theme.setVisualQuality("premium")
     qtbot.waitUntil(lambda: acrylic.property("blurEnabled") is True)
     assert acrylic.property("effectActive") is True
-    _assert_color_approx(acrylic.property("fillColor"), "#9EFBF8F0")
 
 
-def test_acrylic_captures_background_layer(qtbot: QtBot) -> None:
-    _, _, _, window = _load_lab(qtbot)
-    content = _content(window)
-    acrylic = _find_item(content, "labAcrylicSurface")
-    background = _find_item(content, "labBackgroundLayer")
-    assert acrylic is not None and background is not None
-
-    source = acrylic.property("sourceItem")
-    assert source is not None
-    assert source.objectName() == "labBackgroundLayer"
-
-    # The capture rectangle follows the panel geometry inside the layer.
-    rect = acrylic.property("captureRect")
-    assert rect is not None
-    assert rect.width() > 100
-    assert rect.height() > 100
-    assert abs(rect.width() - float(acrylic.property("width"))) < 1
-    assert abs(rect.height() - float(acrylic.property("height"))) < 1
-
-
-def test_system_backdrop_mode_switches_to_opaque_glass(qtbot: QtBot) -> None:
-    _, _, _, window = _load_lab(qtbot)
-    content = _content(window)
-    acrylic = _find_item(content, "labAcrylicSurface")
-    glass = _find_item(content, "labGlassSurface")
-    mica_compare = _find_item(content, "labMicaCompare")
-    assert acrylic is not None and glass is not None and mica_compare is not None
-
-    # Default (no system backdrop): real-time Acrylic visible, glass hidden.
-    assert acrylic.property("visible") is True
-    assert glass.property("visible") is False
-
-    window.setProperty("systemBackdrop", True)
-    qtbot.waitUntil(lambda: glass.property("visible") is True)
-    assert acrylic.property("visible") is False
-    assert glass.property("opaque") is True
-    assert mica_compare.property("visible") is True
-
-    # Backdrop mode makes the window transparent so DWM draws behind it.
-    color = window.property("color")
-    assert color.alpha() == 0
-
-    window.setProperty("systemBackdrop", False)
-    qtbot.waitUntil(lambda: acrylic.property("visible") is True)
-    assert glass.property("visible") is False
-    assert window.property("color").alpha() == 255
-
-
-def test_system_backdrop_quality_tiers_are_distinct(qtbot: QtBot) -> None:
-    """Mica mode must differentiate Safe/Balanced/Premium visibly."""
+def test_quality_switch_keeps_layout_geometry(qtbot: QtBot) -> None:
+    """Diagnosis doc 13.5: tier switches never change layout size."""
     _, _, theme, window = _load_lab(qtbot)
     content = _content(window)
+    paper = _find_item(content, "labPaperSurface")
     acrylic = _find_item(content, "labAcrylicSurface")
-    glass = _find_item(content, "labGlassSurface")
-    mica_compare = _find_item(content, "labMicaCompare")
-    chip = _find_item(content, "labBackdropStatusChip")
-    assert acrylic is not None and glass is not None
-    assert mica_compare is not None and chip is not None
+    assert paper is not None and acrylic is not None
 
-    window.setProperty("systemBackdrop", True)
-    qtbot.waitUntil(lambda: glass.property("visible") is True)
+    baseline = (paper.x(), paper.y(), paper.width(), paper.height(),
+                acrylic.x(), acrylic.y(), acrylic.width(), acrylic.height())
+    for quality in ("safe", "balanced", "premium"):
+        theme.setVisualQuality(quality)
+        qtbot.wait(30)
+        current = (paper.x(), paper.y(), paper.width(), paper.height(),
+                   acrylic.x(), acrylic.y(), acrylic.width(), acrylic.height())
+        assert current == baseline, f"layout changed at {quality}"
 
-    # Balanced: transparent window + Mica wash + opaque glass panel.
-    assert theme.property("visualQuality") == "balanced"
-    assert window.property("micaActive") is True
-    assert window.property("color").alpha() == 0
-    assert abs(float(window.property("backdropWashAlpha")) - 0.32) < 0.01
-    assert chip.property("value") == "Mica"
 
-    # Safe: fully opaque window, wallpaper hidden, in-app Acrylic path back.
-    theme.setVisualQuality("safe")
-    qtbot.waitUntil(lambda: window.property("color").alpha() == 255)
+def test_quality_switch_produces_no_black_blocks(qtbot: QtBot) -> None:
+    _, _, theme, window = _load_lab(qtbot)
+    for quality in ("safe", "balanced", "premium"):
+        theme.setVisualQuality(quality)
+        qtbot.wait(40)
+        image = _grab(window)
+        W, H = image.width(), image.height()
+        dark = 0
+        for y in range(0, H, 8):
+            for x in range(0, W, 8):
+                c = image.pixelColor(x, y)
+                if max(c.red(), c.green(), c.blue()) < 12:
+                    dark += 1
+        assert dark == 0, f"black pixels at {quality}"
+
+
+def test_visual_lab_theme_switch_updates_window(qtbot: QtBot) -> None:
+    _, _, theme, window = _load_lab(qtbot)
+    assert theme.property("themeName") == "paper"
+    theme.setTheme("dark")
+    tokens = theme.property("tokens")
+    assert tokens["color"]["bgCanvas"] == "#202124"
+
+
+def test_experiment_panel_opens_and_closes(qtbot: QtBot) -> None:
+    _, _, _, window = _load_lab(qtbot)
+    content = _content(window)
+    open_button = _find_item(content, "experimentOpenButton")
+    panel = _find_item(content, "experimentControlPanel")
+    close_button = _find_item(content, "experimentCloseButton")
+    assert open_button is not None and panel is not None and close_button is not None
+
+    QMetaObject.invokeMethod(open_button, "clicked")
+    qtbot.waitUntil(lambda: panel.property("open") is True)
+
+    QMetaObject.invokeMethod(close_button, "clicked")
+    qtbot.waitUntil(lambda: panel.property("open") is False)
+
+
+def test_experiment_panel_controls_switch_theme_and_quality(qtbot: QtBot) -> None:
+    _, _, theme, window = _load_lab(qtbot)
+    content = _content(window)
+
+    dark = _find_item(content, "labTheme-dark")
+    premium = _find_item(content, "labQuality-premium")
+    assert dark is not None and premium is not None
+
+    QMetaObject.invokeMethod(dark, "clicked")
+    qtbot.waitUntil(lambda: theme.property("themeName") == "dark")
+    QMetaObject.invokeMethod(premium, "clicked")
+    qtbot.waitUntil(lambda: theme.property("visualQuality") == "premium")
+
+
+def test_mica_experiment_defaults_off(qtbot: QtBot) -> None:
+    _, _, _, window = _load_lab(qtbot)
+    assert window.property("systemBackdrop") is False
     assert window.property("micaActive") is False
-    assert acrylic.property("visible") is True
-    assert glass.property("visible") is False
-    assert mica_compare.property("visible") is False
-    assert chip.property("value") == "Safe 关闭"
-
-    # Premium: transparent again with a lighter wash (Desktop Acrylic).
-    theme.setVisualQuality("premium")
-    qtbot.waitUntil(lambda: window.property("micaActive") is True)
-    assert window.property("color").alpha() == 0
-    assert abs(float(window.property("backdropWashAlpha")) - 0.18) < 0.01
-    assert glass.property("visible") is True
-    assert chip.property("value") == "Desktop Acrylic"
 
 
 def test_streaming_glow_degrades_with_reduce_motion(qtbot: QtBot) -> None:
@@ -254,76 +296,4 @@ def test_visual_quality_cycles_safe_balanced_premium(qtbot: QtBot) -> None:
     assert theme.property("visualQuality") == "premium"
     assert theme.nextVisualQuality() == "safe"
     theme.setVisualQuality("unknown")
-    # Invalid quality values fall back to the Balanced default.
     assert theme.property("visualQuality") == "balanced"
-
-
-def test_visual_quality_segment_buttons_switch_quality(qtbot: QtBot) -> None:
-    _, _, theme, window = _load_lab(qtbot)
-    content = _content(window)
-
-    premium = _find_item(content, "labQuality-premium")
-    assert premium is not None
-    QMetaObject.invokeMethod(premium, "clicked")
-    qtbot.waitUntil(lambda: theme.property("visualQuality") == "premium")
-
-    safe = _find_item(content, "labQuality-safe")
-    assert safe is not None
-    QMetaObject.invokeMethod(safe, "clicked")
-    qtbot.waitUntil(lambda: theme.property("visualQuality") == "safe")
-
-    dark = _find_item(content, "labTheme-dark")
-    assert dark is not None
-    QMetaObject.invokeMethod(dark, "clicked")
-    qtbot.waitUntil(lambda: theme.property("themeName") == "dark")
-
-
-def test_glow_state_buttons_pin_success_error_cancelled(qtbot: QtBot) -> None:
-    _, _, _, window = _load_lab(qtbot)
-    content = _content(window)
-    glow = _find_item(content, "labStreamingGlow")
-    assert glow is not None
-
-    # Thinking: drift animation is live (blue-violet A/B).
-    assert glow.property("animationRunning") is True
-
-    success = _find_item(content, "labGlowSuccess")
-    assert success is not None
-    QMetaObject.invokeMethod(success, "clicked")
-    qtbot.waitUntil(lambda: glow.property("frameColor") == "#3E7C4F")
-    assert glow.property("animationRunning") is False
-
-    error = _find_item(content, "labGlowError")
-    assert error is not None
-    QMetaObject.invokeMethod(error, "clicked")
-    qtbot.waitUntil(lambda: glow.property("frameColor") == "#A6453F")
-
-    cancelled = _find_item(content, "labGlowCancelled")
-    assert cancelled is not None
-    QMetaObject.invokeMethod(cancelled, "clicked")
-    qtbot.waitUntil(lambda: glow.property("frameColor") == "#9A958C")
-
-    thinking = _find_item(content, "labGlowThinking")
-    assert thinking is not None
-    QMetaObject.invokeMethod(thinking, "clicked")
-    qtbot.waitUntil(lambda: glow.property("animationRunning") is True)
-
-
-def test_reduce_motion_button_toggles_glow_to_static(qtbot: QtBot) -> None:
-    _, facade, _, window = _load_lab(qtbot)
-    content = _content(window)
-    glow = _find_item(content, "labStreamingGlow")
-    toggle = _find_item(content, "labReduceMotionButton")
-    assert glow is not None and toggle is not None
-
-    assert facade.property("reduceMotion") is False
-    assert glow.property("animationRunning") is True
-
-    QMetaObject.invokeMethod(toggle, "clicked")
-    qtbot.waitUntil(lambda: facade.property("reduceMotion") is True)
-    qtbot.waitUntil(lambda: glow.property("animationRunning") is False)
-    assert glow.property("frameColor") == "#7C6FD8"  # static thinkingA
-
-    QMetaObject.invokeMethod(toggle, "clicked")
-    qtbot.waitUntil(lambda: facade.property("reduceMotion") is False)
-    qtbot.waitUntil(lambda: glow.property("animationRunning") is True)

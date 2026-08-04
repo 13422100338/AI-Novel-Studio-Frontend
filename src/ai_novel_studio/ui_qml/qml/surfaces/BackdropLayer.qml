@@ -28,7 +28,7 @@ Item {
     // Typed `color` parameter is required: Theme.tokens.* values are strings
     // ("#RRGGBB"); an untyped parameter leaves color.r/g/b undefined and
     // Qt.rgba() silently produces black.
-    function tint(color: color, alpha: real) {
+    function tint(color: color, alpha: real): color {
         return Qt.rgba(color.r, color.g, color.b, alpha)
     }
 

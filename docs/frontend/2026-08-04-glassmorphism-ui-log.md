@@ -270,3 +270,18 @@ $env:PYTHONPATH="$tmp;C:\Users\钟子诚\.codex\worktrees\frontend-clean\src"
   提炼）、VisualLab 标注“主路线：应用内 Acrylic；Mica：可选实验”、纠偏
   文档入库 `docs/frontend/2026-08-04-glass-ui-course-correction.md`；
 - 正式 Shell / 后端 / WebEngine 全部未改动；完整恢复顺序见纠偏文档 §11。
+
+## 11. 追加（2026-08-04）：Visual V0 应用内 Acrylic 重做完成
+
+按《Visual V0 实验页问题诊断与下一版重做要求》重做实验页（交付报告：
+`docs/frontend/2026-08-04-visual-v0-app-acrylic-rework.md`）：
+
+- VisualLab 从“组件陈列室”改为**四栏产品布局**：导航轨 / 章节栏 /
+  正文 PaperSurface / AI Acrylic 面板（纯 QML 静态数据）；
+- **不透明窗口**为主路线：BackdropLayer 覆盖全窗口 + 实色回退，杜绝
+  黑色裸露区；自动断言全窗口覆盖与无纯黑像素；
+- 调试控件移入 `ExperimentControlPanel`（右侧抽屉）；系统 Mica 降为
+  默认关闭的实验开关，通过 `BackdropBridge.apply()` 按需启用；
+- 质量档 Safe/Balanced/Premium 共享同一布局，仅改变 Blur/Noise/阴影强度；
+- 自动测试：157 passed / 35 skipped；截图脚本输出
+  `visual-v0-rework-*.png` 六张并自动断言。

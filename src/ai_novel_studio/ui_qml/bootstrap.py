@@ -7,7 +7,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from PySide6.QtCore import Property, QObject, QUrl
+from PySide6.QtCore import Property, QObject, QUrl, Slot
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
@@ -28,6 +28,30 @@ class EditorAssets(QObject):
     @Property(str, constant=True)
     def indexUrl(self) -> str:
         return self._index_url
+
+
+class BackdropBridge(QObject):
+    """Optional Windows 11 system-backdrop control for the Visual V0 lab.
+
+    The glass course-correction demotes Mica / Desktop Acrylic to an optional,
+    default-off experiment. QML calls ``apply(kind)`` from the experiment
+    control panel; the bridge returns whether the DWM call succeeded so the
+    page can show a live status. The production shell never uses this.
+    """
+
+    def __init__(self, window: QObject | None = None, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self._window = window
+
+    @Slot(str, result=bool)
+    def apply(self, kind: str) -> bool:
+        if self._window is None:
+            return False
+        from ai_novel_studio.ui_qml.bridge.windows_backdrop import (
+            apply_system_backdrop,
+        )
+
+        return apply_system_backdrop(self._window, kind=kind)
 
 
 def register_frontend_types(
@@ -107,30 +131,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         engine.load(QUrl.fromLocalFile(str(visual_lab_qml_path())))
         if not engine.rootObjects():
             return 1
-        # Optional Windows 11 system backdrop (Mica): the lab window becomes
-        # transparent so DWM draws the wallpaper blur behind it; the QML page
-        # switches to its "backdrop" material layout. False is fine on older
-        # Windows / offscreen rendering: the page renders the normal theme.
-        from ai_novel_studio.ui_qml.bridge.windows_backdrop import (
-            apply_system_backdrop,
-        )
-
+        # System Mica / Desktop Acrylic is an optional, default-off experiment
+        # (course correction): the lab window stays opaque and app-controlled.
+        # The experiment panel can enable it on demand through BackdropBridge.
         lab_window = engine.rootObjects()[0]
-        lab_window.setProperty(
-            "systemBackdrop", apply_system_backdrop(lab_window, kind="mica")
+        engine.rootContext().setContextProperty(
+            "BackdropBridge", BackdropBridge(lab_window, engine)
         )
-
-        # Quality tiers map to different DWM backdrops so switching is visible:
-        # Safe = no system backdrop (opaque window), Balanced = Mica,
-        # Premium = Desktop Acrylic (brighter). Re-applies on every change;
-        # failures are silently ignored (the window stays normal).
-        def _sync_system_backdrop(quality: str) -> None:
-            kind = {"safe": "none", "balanced": "mica", "premium": "acrylic"}.get(
-                quality, "mica"
-            )
-            apply_system_backdrop(lab_window, kind=kind)
-
-        theme.quality_changed.connect(_sync_system_backdrop)
         return app.exec()
     engine.rootContext().setContextProperty("WritingPageUseWebEngine", use_webengine)
     if use_webengine:
