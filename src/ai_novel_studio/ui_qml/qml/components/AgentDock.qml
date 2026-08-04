@@ -28,6 +28,7 @@ Item {
     Behavior on Layout.preferredWidth {
         NumberAnimation {
             duration: root.reduceMotion ? 0 : Theme.tokens.duration.panel
+            easing.type: Easing.OutCubic
         }
     }
 

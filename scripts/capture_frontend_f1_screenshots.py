@@ -43,6 +43,29 @@ def _pump_until_agent_idle(app: QGuiApplication, facade: object, timeout: float)
     _pump(app)
 
 
+def _wait_until_visible(
+    app: QGuiApplication,
+    root: QQuickItem,
+    name: str,
+    timeout: float = 1.0,
+) -> None:
+    """Pump while the entrance animation settles, then assert visibility.
+
+    Offscreen QML animations only advance while events are processed, so a
+    plain sleep before asserting lets the animation stand still. Interleave
+    event processing with short sleeps until the component is visible.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        _pump(app, 4)
+        try:
+            _assert_visible(root, name)
+            return
+        except AssertionError:
+            time.sleep(0.02)
+    _assert_visible(root, name)
+
+
 def _find_item(root: QQuickItem, name: str) -> QQuickItem | None:
     """Recursively find a QML item by objectName (covers Repeater delegates)."""
     if root.objectName() == name:
@@ -151,9 +174,8 @@ def main() -> int:
 
     # 4) Selection-reference chip with a content-validated hash.
     facade.setSelectionReferenceJson(_selection_payload())
-    _pump(app)
+    _wait_until_visible(app, content, "selectionReferenceChip")
     assert facade.property("hasSelectionReference") is True
-    _assert_visible(content, "selectionReferenceChip")
     target = out_dir / "c1-selection-reference-chip.png"
     saved = window.grabWindow().save(str(target))
     if not saved:

@@ -14,6 +14,22 @@ Rectangle {
     radius: Theme.tokens.radius.r12
     color: root.selected ? Theme.tokens.color.accent
          : mouseArea.containsMouse ? Theme.tokens.color.hover : "transparent"
+    // Same press feedback language as AppButton: instant on pointer-down,
+    // near-imperceptible at the Tens/day navigation frequency.
+    scale: mouseArea.pressed ? 0.97 : 1.0
+
+    Behavior on color {
+        ColorAnimation {
+            duration: Facade.reduceMotion ? 0 : Theme.tokens.duration.fast
+            easing.type: Easing.OutCubic
+        }
+    }
+    Behavior on scale {
+        NumberAnimation {
+            duration: Facade.reduceMotion ? 0 : 120
+            easing.type: Easing.OutCubic
+        }
+    }
 
     Rectangle {
         width: 3

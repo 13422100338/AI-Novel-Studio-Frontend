@@ -17,7 +17,8 @@ RowLayout {
         radius: 4
         color: root.busy ? Theme.tokens.color.accent : Theme.tokens.color.success
         SequentialAnimation on color {
-            running: root.busy
+            // Reduced motion: keep the state color but drop the looping pulse.
+            running: root.busy && !Facade.reduceMotion
             loops: Animation.Infinite
             ColorAnimation { to: Theme.tokens.color.bgSidebar; duration: 400 }
             ColorAnimation { to: Theme.tokens.color.accent; duration: 400 }

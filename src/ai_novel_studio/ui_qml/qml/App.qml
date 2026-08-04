@@ -87,6 +87,7 @@ ApplicationWindow {
                 Behavior on Layout.preferredWidth {
                     NumberAnimation {
                         duration: Facade.reduceMotion ? 0 : Theme.tokens.duration.panel
+                        easing.type: Easing.OutCubic
                     }
                 }
 

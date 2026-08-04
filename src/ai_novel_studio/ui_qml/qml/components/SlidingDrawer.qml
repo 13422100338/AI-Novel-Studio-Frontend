@@ -24,7 +24,10 @@ Item {
         visible: root.open
 
         Behavior on opacity {
-            NumberAnimation { duration: Facade.reduceMotion ? 0 : Theme.tokens.duration.fast }
+            NumberAnimation {
+                duration: Facade.reduceMotion ? 0 : Theme.tokens.duration.fast
+                easing.type: Easing.OutCubic
+            }
         }
 
         MouseArea {
@@ -47,7 +50,10 @@ Item {
         clip: true
 
         Behavior on x {
-            NumberAnimation { duration: Facade.reduceMotion ? 0 : Theme.tokens.duration.panel }
+            NumberAnimation {
+                duration: Facade.reduceMotion ? 0 : Theme.tokens.duration.panel
+                easing.type: Easing.OutCubic
+            }
         }
 
         CreativeAgentPanel {

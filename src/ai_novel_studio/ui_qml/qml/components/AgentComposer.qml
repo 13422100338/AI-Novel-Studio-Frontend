@@ -12,7 +12,8 @@ ColumnLayout {
 
     ContextReferenceChip {
         objectName: "selectionReferenceChip"
-        visible: Facade.hasSelectionReference
+        opacity: Facade.hasSelectionReference ? 1 : 0
+        visible: opacity > 0.01
         label: Facade.selectionReferenceLabel
         preview: Facade.selectionReferencePreview
         onCleared: Facade.clearSelectionReference()

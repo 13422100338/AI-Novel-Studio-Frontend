@@ -18,9 +18,22 @@ Rectangle {
          : root.primary ? Theme.tokens.color.accent
          : Theme.tokens.color.bgSurface
     opacity: root.enabled ? 1.0 : 0.5
+    // Press feedback: respond on pointer-down, subtle and near-imperceptible
+    // (Tens/day frequency tier). Ease-out starts fast so the press feels
+    // immediate, not delayed.
+    scale: mouseArea.pressed ? 0.97 : 1.0
 
     Behavior on color {
-        ColorAnimation { duration: Facade.reduceMotion ? 0 : Theme.tokens.duration.fast }
+        ColorAnimation {
+            duration: Facade.reduceMotion ? 0 : Theme.tokens.duration.fast
+            easing.type: Easing.OutCubic
+        }
+    }
+    Behavior on scale {
+        NumberAnimation {
+            duration: Facade.reduceMotion ? 0 : 120
+            easing.type: Easing.OutCubic
+        }
     }
 
     Text {
@@ -32,6 +45,7 @@ Rectangle {
     }
 
     MouseArea {
+        id: mouseArea
         anchors.fill: parent
         enabled: root.enabled
         hoverEnabled: true

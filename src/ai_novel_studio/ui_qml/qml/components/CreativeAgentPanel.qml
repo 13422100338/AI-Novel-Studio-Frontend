@@ -74,6 +74,10 @@ Item {
 
             delegate: Loader {
                 id: delegateLoader
+                // New timeline cards fade in instead of popping; opacity and
+                // scale never touch height, so C1.3 geometry stays intact.
+                opacity: 0
+                scale: 0.98
                 // Content width of the list viewport: never let a card extend
                 // under the scrollbar or past the visible area.
                 width: Math.max(
@@ -87,6 +91,19 @@ Item {
                 // out in order without overlap.
                 height: implicitHeight
                 sourceComponent: root.componentFor(kind)
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: Facade.reduceMotion ? 0 : 150
+                        easing.type: Easing.OutCubic
+                    }
+                }
+                Behavior on scale {
+                    NumberAnimation {
+                        duration: Facade.reduceMotion ? 0 : 150
+                        easing.type: Easing.OutCubic
+                    }
+                }
 
                 onLoaded: {
                     const loadedItem = delegateLoader.item
@@ -172,6 +189,8 @@ Item {
                     } else if (kind === "warning" || kind === "error") {
                         loadedItem.text = text
                     }
+                    delegateLoader.opacity = 1
+                    delegateLoader.scale = 1.0
                 }
             }
 

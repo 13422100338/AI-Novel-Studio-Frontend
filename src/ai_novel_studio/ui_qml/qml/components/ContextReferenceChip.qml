@@ -14,6 +14,15 @@ Rectangle {
     border.color: Theme.tokens.color.accent
     border.width: 1
 
+    // Prevent a jarring pop-in: the chip fades in/out when a selection
+    // reference appears or is cleared. Occasional frequency, ease-out.
+    Behavior on opacity {
+        NumberAnimation {
+            duration: Facade.reduceMotion ? 0 : 150
+            easing.type: Easing.OutCubic
+        }
+    }
+
     RowLayout {
         anchors.fill: parent
         anchors.leftMargin: 8
