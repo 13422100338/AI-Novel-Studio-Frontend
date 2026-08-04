@@ -253,24 +253,23 @@ def test_liquid_glass_layers_follow_quality_tiers(qtbot: QtBot) -> None:
     _, _, theme, window = _load_lab(qtbot)
     content = _content(window)
     acrylic = _find_item(content, "labAcrylicSurface")
-    liquid_layers = _find_item(content, "liquidLayers")
-    liquid_mask = _find_item(content, "liquidLayersMask")
+    liquid_lights = _find_item(content, "liquidLights")
     assert acrylic is not None
-    assert liquid_layers is not None and liquid_mask is not None
+    assert liquid_lights is not None
 
     # Balanced: liquid layers active with positive strength.
     assert theme.property("visualQuality") == "balanced"
     assert float(acrylic.property("specularOpacity")) > 0
     assert float(acrylic.property("edgeLightOpacity")) > 0
     assert float(acrylic.property("innerShadowOpacity")) > 0
-    assert liquid_mask.property("visible") is True
+    assert liquid_lights.property("visible") is True
 
     # Safe: all liquid layers hidden and strengths zero.
     theme.setVisualQuality("safe")
     qtbot.waitUntil(lambda: float(acrylic.property("specularOpacity")) == 0.0)
     assert float(acrylic.property("edgeLightOpacity")) == 0.0
     assert float(acrylic.property("innerShadowOpacity")) == 0.0
-    assert liquid_mask.property("visible") is False
+    assert liquid_lights.property("visible") is False
 
     # Premium: strictly stronger than Balanced (tier separation must hold).
     theme.setVisualQuality("balanced")
@@ -284,7 +283,29 @@ def test_liquid_glass_layers_follow_quality_tiers(qtbot: QtBot) -> None:
     )
     assert float(acrylic.property("edgeLightOpacity")) > balanced_edge
     assert float(acrylic.property("innerShadowOpacity")) > balanced_shadow
-    assert liquid_mask.property("visible") is True
+    assert liquid_lights.property("visible") is True
+
+
+def test_agent_cards_share_liquid_edge_lights(qtbot: QtBot) -> None:
+    """Cards (TextDiff/ChangeSet/Form) share the edge light + inner shadow
+    language of the glass panels; Safe hides it and cards never draw the
+    specular sheen over content."""
+    _, _, theme, window = _load_lab(qtbot)
+    content = _content(window)
+    for card_name in ("labDiffCard", "labChangeSetCard", "labFormCard"):
+        card = _find_item(content, card_name)
+        assert card is not None, f"missing {card_name}"
+        lights = _find_item(card, "cardLiquidLights")
+        assert lights is not None, f"{card_name}: cardLiquidLights missing"
+        assert lights.property("visible") is True
+        assert float(lights.property("edgeLightOpacity")) > 0
+        assert float(lights.property("innerShadowOpacity")) > 0
+        assert float(lights.property("specularOpacity")) == 0.0
+
+    theme.setVisualQuality("safe")
+    card = _find_item(content, "labDiffCard")
+    lights = _find_item(card, "cardLiquidLights")
+    qtbot.waitUntil(lambda: lights.property("visible") is False)
 
 
 def test_light_theme_glass_uses_positive_saturation(qtbot: QtBot) -> None:

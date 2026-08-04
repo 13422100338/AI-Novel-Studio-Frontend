@@ -339,3 +339,39 @@ dark 下明显、light 下几乎看不出。本轮结论：**视觉近似可行�
   `AcrylicSurface` 平移到正式 UI。
 - light 下玻璃的“明显程度”由背景丰富度决定，token（specular/edge/glow）
   都可单独微调，不需要逐个按钮改魔法数字。
+
+## 13. 追加（2026-08-04）：LiquidLights 抽取、卡片共享材质、扁平化收束
+
+用户反馈第二轮：dark 斜向高光过于明显生硬、paper/light 又不够明显；既然
+做了边缘光/内阴影，其他框（卡片）也该统一。第三轮追加：阴影整体要很微弱，
+样式更趋于扁平化。
+
+### 13.1 结构改动
+
+- 新增共享组件 `surfaces/LiquidLights.qml`：一个静态 Canvas 一次绘制
+  斜向 specular + 顶/左边缘光 + 底/右内阴影，自带圆角 clip（Canvas 2D
+  roundedRect path + ctx.clip），替代原来 AcrylicSurface 内联的
+  Canvas + MultiEffect mask 组合。
+  - specular 渐变端点延伸到 `(w*1.15, h*0.75)`、亮带停靠拉宽，斜向光带
+    变得宽而柔，不再是一条硬斜线。
+- `AcrylicSurface.qml` 改挂 `LiquidLights`（radius/specular/edge/inner 全部
+  由 token 驱动），面板外投影从 5px/3px 降到 3px/2px（扁平化）。
+- `AgentCard.qml` 挂载淡 `LiquidLights`：卡片共享“光从左上落”的材质语言，
+  只用边缘光 + 内阴影（specular 保持 0，不往内容上画高光）；Safe 档隐藏。
+  三张实验卡片（TextDiff/ChangeSet/Form）与正式 CreativeAgentPanel 共用
+  同一容器，一处改动全部生效。
+
+### 13.2 强度收束（token，三主题）
+
+- dark specular premium 0.26 → 0.16（柔和化）；paper 0.30 → 0.42、
+  light 0.52 → 0.62（浅色下更明显，配合亮带拉宽）。
+- glass 内阴影 premium 0.28/0.36/0.32 → 0.14/0.16/0.15；边缘光同步下调。
+- 卡片内阴影 0.07/0.12/0.07 → 0.04/0.05/0.04，边缘光 0.14/0.12/0.16 →
+  0.09/0.08/0.10——只保留极淡层次，扁平化。
+
+### 13.3 验证
+
+- 前端 pytest 166 passed / 35 skipped（新增卡片共享材质测试）；ruff 通过；
+  mypy（项目配置）通过。
+- 真机 windowed 像素：light/dark 面板底部内阴影亮度差收敛到 ~8-10/255
+  （此前层级明显更深）；卡片内阴影 ~0.04-0.05，肉眼为极淡层次。

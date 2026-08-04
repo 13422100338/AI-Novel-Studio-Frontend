@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import "../surfaces"
 
 // Shared timeline card container (C1.2). Centralizes the responsive rules that
 // every Agent timeline card must follow:
@@ -28,6 +29,18 @@ Rectangle {
 
     property string cardTitle: ""
     property color titleColor: Theme.tokens.color.textPrimary
+
+    // Shared "light falls from the top-left" material language: every card
+    // gets the same edge light + inner shadow as the glass panels (weaker, no
+    // specular sheen over content). Hidden entirely in Safe tier.
+    LiquidLights {
+        objectName: "cardLiquidLights"
+        anchors.fill: parent
+        radius: root.radius
+        edgeLightOpacity: parseFloat(Theme.tokens.material.cardEdgeLight)
+        innerShadowOpacity: parseFloat(Theme.tokens.material.cardInnerShadow)
+        visible: Theme.visualQuality !== "safe"
+    }
 
     ColumnLayout {
         id: body

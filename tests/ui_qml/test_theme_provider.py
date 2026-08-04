@@ -78,3 +78,15 @@ def test_liquid_glass_tokens_per_theme_and_tier() -> None:
     # Light mode gets richer backdrop glows so the glass has color to transmit.
     assert float(light["backdropGlowWarm"]) > float(dark["backdropGlowWarm"])
     assert float(light["backdropGlowCool"]) > float(dark["backdropGlowCool"])
+    # Dark specular is capped so the sheen stays soft (user feedback: the
+    # diagonal highlight read as harsh at the previous 0.26).
+    assert float(dark["glassSpecularPremium"]) <= 0.20
+    # Every theme ships card edge-light tokens with positive strength.
+    for material in (light, dark):
+        assert float(material["cardEdgeLight"]) > 0
+        assert float(material["cardInnerShadow"]) > 0
+    # Flat-style guardrail (user feedback: shadows should be faint, style
+    # flatter): inner shadows stay well under the old values everywhere.
+    for material in (light, dark):
+        assert float(material["cardInnerShadow"]) <= 0.06
+        assert float(material["glassInnerShadowPremium"]) <= 0.20

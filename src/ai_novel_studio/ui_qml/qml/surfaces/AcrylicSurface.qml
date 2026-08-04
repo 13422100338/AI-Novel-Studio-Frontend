@@ -104,9 +104,6 @@ Item {
     onHeightChanged: root.updateCaptureRect()
     onVisibleChanged: root.updateCaptureRect()
     Component.onCompleted: root.updateCaptureRect()
-    onSpecularOpacityChanged: liquidLayers.requestPaint()
-    onEdgeLightOpacityChanged: liquidLayers.requestPaint()
-    onInnerShadowOpacityChanged: liquidLayers.requestPaint()
 
     // Rounded-corner mask for the blurred pass (Qt blog "advanced case").
     Item {
@@ -123,12 +120,14 @@ Item {
     }
 
     // Static soft shadow (Safe tier may keep static shadows; no blur/shader).
+    // Kept deliberately faint and thin so the material reads as flat rather
+    // than floating (user feedback: shadows should be subtle, style flatter).
     Rectangle {
         anchors.fill: parent
         anchors.topMargin: 2
         radius: root.radius + 2
         color: "transparent"
-        border.width: root.elevated ? 5 : 3
+        border.width: root.elevated ? 3 : 2
         border.color: Theme.tokens.elevation.shadowSoft
         z: -1
     }
@@ -204,92 +203,19 @@ Item {
         }
 
         // Liquid Glass layer stack (iOS 26 research stack): diagonal specular
-        // sheen + top/left edge light + bottom/right inner shadow, painted in
-        // one static Canvas so it costs nothing at idle. The MultiEffect pass
-        // reuses the same rounded-rect mask as the blur so the soft gradients
-        // never leak past the rounded corners.
-        Canvas {
-            id: liquidLayers
-            objectName: "liquidLayers"
+        // sheen + top/left edge light + bottom/right inner shadow. Shared
+        // LiquidLights component paints them in one static Canvas clipped to
+        // the rounded rect, so nothing leaks past the corners.
+        LiquidLights {
+            id: liquidLights
+            objectName: "liquidLights"
             anchors.fill: parent
             anchors.margins: 1
-
-            onWidthChanged: liquidLayers.requestPaint()
-            onHeightChanged: liquidLayers.requestPaint()
-
-            onPaint: {
-                const ctx = liquidLayers.getContext("2d")
-                ctx.reset()
-                const w = liquidLayers.width
-                const h = liquidLayers.height
-                const spec = root.specularOpacity
-                const edge = root.edgeLightOpacity
-                const inner = root.innerShadowOpacity
-                if (spec <= 0 && edge <= 0 && inner <= 0) {
-                    return
-                }
-                const white = function (a) {
-                    return "rgba(255,255,255," + a.toFixed(3) + ")"
-                }
-                const black = function (a) {
-                    return "rgba(0,0,0," + a.toFixed(3) + ")"
-                }
-
-                // Diagonal specular sheen (the signature Liquid Glass layer).
-                if (spec > 0) {
-                    const sheen = ctx.createLinearGradient(0, 0, w * 0.9, h * 0.55)
-                    sheen.addColorStop(0.0, white(spec))
-                    sheen.addColorStop(0.22, white(spec * 0.45))
-                    sheen.addColorStop(0.62, white(0))
-                    ctx.fillStyle = sheen
-                    ctx.fillRect(0, 0, w, h)
-                }
-
-                // Top edge light: light gathering along the upper rim.
-                if (edge > 0) {
-                    const top = ctx.createLinearGradient(0, 0, 0, 10)
-                    top.addColorStop(0.0, white(edge))
-                    top.addColorStop(1.0, white(0))
-                    ctx.fillStyle = top
-                    ctx.fillRect(0, 0, w, 10)
-
-                    // Left edge light: weaker rim on the lit side.
-                    const left = ctx.createLinearGradient(0, 0, 8, 0)
-                    left.addColorStop(0.0, white(edge * 0.55))
-                    left.addColorStop(1.0, white(0))
-                    ctx.fillStyle = left
-                    ctx.fillRect(0, 0, 8, h)
-                }
-
-                // Bottom/right inner shadow: material thickness; the light
-                // falls from the top-left.
-                if (inner > 0) {
-                    const bottom = ctx.createLinearGradient(0, h, 0, h - 10)
-                    bottom.addColorStop(0.0, black(inner))
-                    bottom.addColorStop(1.0, black(0))
-                    ctx.fillStyle = bottom
-                    ctx.fillRect(0, h - 10, w, 10)
-
-                    const right = ctx.createLinearGradient(w, 0, w - 8, 0)
-                    right.addColorStop(0.0, black(inner * 0.8))
-                    right.addColorStop(1.0, black(0))
-                    ctx.fillStyle = right
-                    ctx.fillRect(w - 8, 0, 8, h)
-                }
-            }
-        }
-        MultiEffect {
-            id: liquidLayersMask
-            objectName: "liquidLayersMask"
-            anchors.fill: liquidLayers
-            source: liquidLayers
+            radius: root.radius
+            specularOpacity: root.specularOpacity
+            edgeLightOpacity: root.edgeLightOpacity
+            innerShadowOpacity: root.innerShadowOpacity
             visible: root.effectActive
-            enabled: root.effectActive
-            blurEnabled: false
-            maskEnabled: true
-            maskSource: maskItem
-            maskThresholdMin: 0.5
-            maskSpreadAtMin: 1.0
         }
 
         NoiseOverlay {
