@@ -119,6 +119,7 @@ ApplicationWindow {
                     WritingPage {
                         id: writingPage
                         useWebEngine: window.useWebEngine
+                        backdropSource: backgroundLayer
                     }
 
                     MemoryLibraryPage {}

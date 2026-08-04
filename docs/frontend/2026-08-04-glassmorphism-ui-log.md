@@ -635,6 +635,43 @@ reduceMotion 降级、无黑块；工具条关闭无动画（高频动作）。
 - 正式 Shell 尚无质量档 UI（沿用 ThemeProvider 默认 balanced）；后续可在
   设置页暴露 Safe/Balanced/Premium。
 
+## 21. 追加（2026-08-04）：正文框米色修复 + 中间框玻璃升级
+
+用户反馈：中间正文框在 dark/light 下都是米色；并要求给中间框也做玻璃升级。
+
+### 21.1 米色根因
+
+WebEngine 编辑器页面（`editor_web/src/style.css`）把 `.novel-editor` 的
+`--editor-bg` 默认写死为 `#fffdf7`（米白），而 `NovelEditorView.applyTheme`
+虽然存在（含 `apply_theme_script` 助手）却**从未被调用**——主题切换只改了
+Qt 侧画布色，页面内部 html/body 与 ProseMirror 一直落在默认米白。
+
+### 21.2 改动
+
+- `NovelEditorView.qml`：新增 `applyCurrentTheme()`，把
+  `--editor-bg/--editor-text/--editor-accent/--editor-muted` 四个 CSS 变量
+  从 Theme tokens（bgEditor/textPrimary/accent/textSecondary）推给页面；
+  `Connections target: Theme onTokensChanged` 与页面 `editorLoaded` 时各推
+  一次——dark 下页面背景变 `#292A2D`、light 变 `#FFFFFF`、paper 保持
+  `#FFFDF7`，滚动条轨道与正文同步。
+- `WritingPage.qml`：正文容器从实色 Rectangle 换成 `AcrylicSurface`
+  （objectName `manuscriptHost`，`sourceItem: root.backdropSource`，
+  radius r16）：TextArea 模式正文直接坐在玻璃上；WebEngine 模式页面背景
+  （随主题）保持不透明以保证阅读，圆角边缘与背景光晕读作玻璃（WebEngine
+  禁用实时 blur 的既有约束不变）。
+- `App.qml`：`WritingPage` 传入 `backdropSource: backgroundLayer`。
+
+### 21.3 验证
+
+- 新增 2 个测试：`manuscriptHost` 为玻璃（sourceItem=f1BackgroundLayer、
+  blurEnabled、Safe 降级不透明）；WebEngine 主题接线契约 + 三主题 bgEditor
+  token（paper #FFFDF7 / light #FFFFFF / dark #292A2D）。
+  WebEngineView 无法 offscreen 实例化，故用源码契约 + token 断言锁定。
+- 前端 pytest 180 passed / 35 skipped；ruff 通过；mypy（项目配置）通过。
+- 正式 shell 截图（TextArea 模式）：正文容器顶部边缘 vs 内部
+  （dark 66.7 vs 41.0、light 216 vs 245、paper 221 vs 249）——玻璃边缘光与
+  背景光晕生效；dark 下内部为深色（不再米色）。
+
 ## 16. 追加（2026-08-04）：Header 玻璃化、控制条边缘统一、资源门禁
 
 “做下一波”收尾：实验页剩余大容器统一玻璃语言，并补齐资源/几何门禁测试。

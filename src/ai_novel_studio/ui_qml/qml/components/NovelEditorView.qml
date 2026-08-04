@@ -65,6 +65,38 @@ WebEngineView {
         }
     }
 
+    // The editor page ships paper-theme defaults in style.css (--editor-bg
+    // #fffdf7), so without this the page stays beige in every theme. Push the
+    // current Theme tokens into the page as CSS variables on load and on every
+    // theme change, so html/body, scrollbars and ProseMirror all repaint with
+    // the active theme.
+    function applyCurrentTheme() {
+        var tokens = {
+            "--editor-bg": Theme.tokens.color.bgEditor,
+            "--editor-text": Theme.tokens.color.textPrimary,
+            "--editor-accent": Theme.tokens.color.accent,
+            "--editor-muted": Theme.tokens.color.textSecondary,
+        }
+        runJavaScript(
+            "window.__novelEditor && " +
+            "window.__novelEditor.applyTheme(" + JSON.stringify(tokens) + ")"
+        )
+    }
+
+    Connections {
+        target: Theme
+        function onTokensChanged() {
+            webView.applyCurrentTheme()
+        }
+    }
+
+    Connections {
+        target: webView
+        function onEditorLoaded() {
+            webView.applyCurrentTheme()
+        }
+    }
+
     function loadChapter(payloadJson) {
         runJavaScript(
             "window.__novelEditor && " +

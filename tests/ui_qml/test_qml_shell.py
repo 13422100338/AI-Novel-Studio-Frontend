@@ -173,6 +173,50 @@ def test_shell_glass_integration_sidebar_toggle_stays_one_step(
     assert float(sidebar.property("width")) > 100
 
 
+def test_manuscript_host_is_glass_over_backdrop(qtbot: QtBot) -> None:
+    """The central manuscript container is now an Acrylic surface over the
+    shared backdrop (glass upgrade), and Safe tier degrades it to opaque."""
+    engine, _, theme = _load_engine(qtbot)
+    window = engine.rootObjects()[0]
+    content = window.contentItem()
+
+    host = _find_quick_item(content, "manuscriptHost")
+    assert host is not None
+    assert host.property("sourceItem").objectName() == "f1BackgroundLayer"
+    assert host.property("blurEnabled") is True
+
+    theme.setVisualQuality("safe")
+    qtbot.waitUntil(lambda: host.property("blurEnabled") is False)
+    assert host.property("fillColor").alpha() == 255
+
+
+def test_web_editor_theme_wiring_and_tokens(qtbot: QtBot) -> None:
+    """The beige-editor root cause is fixed by wiring: NovelEditorView binds
+    its canvas to Theme tokens and pushes them into the page on load/change.
+    WebEngineView cannot instantiate offscreen, so this locks the wiring by
+    source contract plus the token values themselves."""
+    editor_qml = (
+        Path(__file__).resolve().parent.parent.parent
+        / "src"
+        / "ai_novel_studio"
+        / "ui_qml"
+        / "qml"
+        / "components"
+        / "NovelEditorView.qml"
+    ).read_text(encoding="utf-8")
+    assert "backgroundColor: Theme.tokens.color.bgEditor" in editor_qml
+    assert "function applyCurrentTheme" in editor_qml
+    assert "window.__novelEditor.applyTheme" in editor_qml
+    assert "onTokensChanged" in editor_qml
+
+    theme = ThemeProvider()
+    assert theme.property("tokens")["color"]["bgEditor"] == "#FFFDF7"  # paper
+    theme.setTheme("light")
+    assert theme.property("tokens")["color"]["bgEditor"] == "#FFFFFF"
+    theme.setTheme("dark")
+    assert theme.property("tokens")["color"]["bgEditor"] == "#292A2D"
+
+
 def test_typing_marks_editor_dirty_and_save_clears(qtbot: QtBot) -> None:
     engine, facade, _ = _load_engine(qtbot)
     window = engine.rootObjects()[0]

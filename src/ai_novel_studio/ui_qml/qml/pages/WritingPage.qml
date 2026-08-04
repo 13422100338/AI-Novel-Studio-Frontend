@@ -2,12 +2,16 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import "../components"
+import "../surfaces"
 
 Item {
     id: root
 
     property bool useWebEngine: false
     property string lastEditorChapterId: ""
+    // Window backdrop passed from the shell; the manuscript host becomes an
+    // Acrylic surface over it (same glass language as nav/sidebar/dock).
+    property Item backdropSource: null
 
     Rectangle {
         anchors.fill: parent
@@ -74,13 +78,16 @@ Item {
             }
         }
 
-        Rectangle {
+        // Manuscript host: glass panel over the shared backdrop. In TextArea
+        // mode the editor sits directly on the glass; in WebEngine mode the
+        // page background (theme-synced) stays opaque on top for readability
+        // while the rounded rim and glow read as glass.
+        AcrylicSurface {
+            objectName: "manuscriptHost"
             Layout.fillWidth: true
             Layout.fillHeight: true
             radius: Theme.tokens.radius.r16
-            color: Theme.tokens.color.bgEditor
-            border.color: Theme.tokens.color.border
-            border.width: 1
+            sourceItem: root.backdropSource
             clip: true
 
             ScrollView {
