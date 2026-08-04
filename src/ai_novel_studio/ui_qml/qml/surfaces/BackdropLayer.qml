@@ -94,42 +94,65 @@ Item {
         }
     }
 
-    // Soft color fields (low saturation, calm; spec 4.1 "avoid RGB").
+    // --- Light fields (diagnosis doc §6.3): recognizable but low-contrast
+    // warm/cool glows + faint geometry so the Acrylic blur has something to
+    // soften. Colors come only from Theme tokens (low alpha, calm).
+
+    // Top-left warm gold glow (behind the nav/sidebar area).
     Rectangle {
         visible: !root.washEnabled
-        x: parent.width * 0.03
-        y: parent.height * 0.16
-        width: parent.width * 0.24
-        height: parent.height * 0.30
-        radius: 20
-        color: root.tint(Theme.tokens.color.accent, 0.07)
+        x: -parent.width * 0.06
+        y: -parent.height * 0.06
+        width: parent.width * 0.42
+        height: parent.height * 0.44
+        radius: parent.width * 0.21
+        color: root.tint(Theme.tokens.color.warning, 0.10)
+    }
+
+    // Top-right cool blue-violet glow (behind the AI panel).
+    Rectangle {
+        visible: !root.washEnabled
+        x: parent.width * 0.64
+        y: -parent.height * 0.05
+        width: parent.width * 0.42
+        height: parent.height * 0.46
+        radius: parent.width * 0.21
+        color: root.tint(Theme.tokens.agent.thinkingA, 0.09)
+    }
+
+    // Mid-lower gray-blue soft light (behind the paper bottom).
+    Rectangle {
+        visible: !root.washEnabled
+        x: parent.width * 0.28
+        y: parent.height * 0.58
+        width: parent.width * 0.44
+        height: parent.height * 0.34
+        radius: parent.width * 0.22
+        color: root.tint(Theme.tokens.color.textSecondary, 0.05)
+    }
+
+    // Faint geometry outlines: ring + diagonal hairline (barely visible).
+    Rectangle {
+        visible: !root.washEnabled
+        x: parent.width * 0.40
+        y: parent.height * 0.26
+        width: parent.width * 0.10
+        height: parent.width * 0.10
+        radius: parent.width * 0.05
+        color: "transparent"
+        border.color: Theme.tokens.color.border
+        border.width: 1
+        opacity: 0.45
     }
     Rectangle {
         visible: !root.washEnabled
-        x: parent.width * 0.70
-        y: parent.height * 0.18
-        width: parent.width * 0.24
-        height: parent.height * 0.26
-        radius: 24
-        color: root.tint(Theme.tokens.color.accent, 0.06)
-    }
-    Rectangle {
-        visible: !root.washEnabled
-        x: parent.width * 0.60
-        y: parent.height * 0.54
-        width: parent.width * 0.32
-        height: parent.height * 0.20
-        radius: 18
-        color: root.tint(Theme.tokens.color.accent, 0.05)
-    }
-    Rectangle {
-        visible: !root.washEnabled
-        x: parent.width * 0.38
-        y: parent.height * 0.22
-        width: parent.width * 0.12
-        height: parent.width * 0.12
-        radius: parent.width * 0.06
-        color: root.tint(Theme.tokens.agent.thinkingA, 0.05)
+        x: parent.width * 0.20
+        y: parent.height * 0.66
+        width: parent.width * 0.055
+        height: 1
+        rotation: -24
+        color: Theme.tokens.color.border
+        opacity: 0.35
     }
 
     // Manuscript excerpt card (behind the AI glass column).

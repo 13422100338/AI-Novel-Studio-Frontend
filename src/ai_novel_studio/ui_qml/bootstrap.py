@@ -72,6 +72,9 @@ def register_frontend_types(
     engine.rootContext().setContextProperty("Facade", facade)
     engine.rootContext().setContextProperty("Theme", theme)
     engine.rootContext().setContextProperty("WritingPageUseWebEngine", False)
+    # Visual V0 lab only: the active Qt Quick rendering backend (displayed in
+    # the experiment control strip). Harmless placeholder for non-lab shells.
+    engine.rootContext().setContextProperty("RenderBackendInfo", "unknown")
     return facade, theme
 
 
@@ -137,6 +140,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         lab_window = engine.rootObjects()[0]
         engine.rootContext().setContextProperty(
             "BackdropBridge", BackdropBridge(lab_window, engine)
+        )
+        from PySide6.QtQuick import QQuickWindow as _QQuickWindow
+
+        engine.rootContext().setContextProperty(
+            "RenderBackendInfo", _QQuickWindow.sceneGraphBackend() or "unknown"
         )
         return app.exec()
     engine.rootContext().setContextProperty("WritingPageUseWebEngine", use_webengine)

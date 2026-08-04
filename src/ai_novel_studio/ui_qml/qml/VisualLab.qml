@@ -43,6 +43,26 @@ ApplicationWindow {
     property bool debugBackdrop: false
     property bool debugSourceRect: false
     property bool debugBlurRegion: false
+    // Lightweight FPS estimate (diagnosis doc §10: show FPS / render backend).
+    property int frameCount: 0
+    property int lastFrameCount: 0
+    property real fpsEstimate: 0
+
+    Connections {
+        target: root
+        function onFrameSwapped() {
+            root.frameCount += 1
+        }
+    }
+    Timer {
+        interval: 1000
+        repeat: true
+        running: root.visible
+        onTriggered: {
+            root.fpsEstimate = root.frameCount - root.lastFrameCount
+            root.lastFrameCount = root.frameCount
+        }
+    }
 
     // App-controlled backdrop: full-window coverage with solid fallback.
     BackdropLayer {
@@ -97,6 +117,9 @@ ApplicationWindow {
             clip: true
             visible: root.experimentOpen
             open: root.experimentOpen
+            fpsEstimate: root.fpsEstimate
+            renderBackend: typeof RenderBackendInfo !== "undefined"
+                ? RenderBackendInfo : "unknown"
             debugBackdrop: root.debugBackdrop
             debugSourceRect: root.debugSourceRect
             debugBlurRegion: root.debugBlurRegion

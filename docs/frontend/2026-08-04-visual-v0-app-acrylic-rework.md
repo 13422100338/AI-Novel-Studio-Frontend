@@ -159,6 +159,25 @@ visual-v0-rework-resized.png
 - 视觉复核（atlas-vision）：sidebar + main + right panel 结构完整，AI
   面板可见。
 
+### 10.2 追加（2026-08-04）：背景光团 / FPS·渲染后端 / 主题黑块检查
+
+按诊断文档补齐剩余要求：
+
+- **§6.3 背景内容**：`BackdropLayer` 将低饱和色块升级为明确的
+  「左上暖金色光团（warning 低 alpha）+ 右上淡蓝紫光团（thinkingA 低
+  alpha）+ 中下灰蓝柔光（textSecondary 低 alpha）+ 极淡圆环/斜线几何
+  轮廓」，全部低对比、颜色走 Theme tokens，让 Acrylic 模糊“前后差异”
+  可感知；
+- **§10 调试控制台**：实验控制条新增「FPS + 渲染后端」显示（VisualLab
+  通过 `onFrameSwapped` 计数、1s 窗口估算 FPS；bootstrap 暴露
+  `RenderBackendInfo`，真机显示 d3d11/opengl 等实际后端）；
+- **§13.5**：新增 `test_theme_switch_produces_no_black_blocks`，遍历
+  paper/light/dark 切换后截图断言无纯黑像素。
+
+验证：前端 pytest 159 passed / 35 skipped；c9a2 集成 235 passed；
+ruff / mypy 通过；六张 `visual-v0-rework-*.png` 重新生成并通过全窗口
+覆盖 + 无纯黑断言。
+
 ## 11. 是否建议接入正式 Shell
 
 暂不接入。先由用户在真机确认本版应用内 Acrylic 视觉与稳定性；通过后再按

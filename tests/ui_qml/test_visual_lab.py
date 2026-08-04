@@ -242,6 +242,23 @@ def test_visual_lab_theme_switch_updates_window(qtbot: QtBot) -> None:
     assert tokens["color"]["bgCanvas"] == "#202124"
 
 
+def test_theme_switch_produces_no_black_blocks(qtbot: QtBot) -> None:
+    """Diagnosis doc 13.5: switching themes must not create black holes."""
+    _, _, theme, window = _load_lab(qtbot)
+    for name in ("paper", "light", "dark"):
+        theme.setTheme(name)
+        qtbot.wait(40)
+        image = _grab(window)
+        W, H = image.width(), image.height()
+        dark = 0
+        for y in range(0, H, 8):
+            for x in range(0, W, 8):
+                c = image.pixelColor(x, y)
+                if max(c.red(), c.green(), c.blue()) < 12:
+                    dark += 1
+        assert dark == 0, f"pure-black pixels at theme {name}"
+
+
 def test_experiment_panel_opens_and_closes(qtbot: QtBot) -> None:
     _, _, _, window = _load_lab(qtbot)
     content = _content(window)

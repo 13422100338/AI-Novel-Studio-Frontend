@@ -18,6 +18,8 @@ Item {
     property bool debugBlurRegion: false
     property bool micaExperiment: false
     property string micaStatus: "未启用"
+    property real fpsEstimate: 0
+    property string renderBackend: "unknown"
     signal closed()
     signal micaChanged(bool enabled)
 
@@ -159,6 +161,14 @@ Item {
                 text: root.debugBlurRegion ? "blur 区域：显示" : "blur 区域：隐藏"
                 ghost: true
                 onClicked: root.debugBlurRegion = !root.debugBlurRegion
+            }
+
+            // Performance info (diagnosis doc §10): FPS + render backend.
+            Text {
+                text: "FPS：" + root.fpsEstimate.toFixed(0) + " · 后端：" + root.renderBackend
+                font.pixelSize: 10
+                verticalAlignment: Text.AlignVCenter
+                color: Theme.tokens.color.textSecondary
             }
         }
     }
