@@ -21,6 +21,14 @@ def _material(theme_name: str) -> dict[str, str]:
     blur there until Visual V4 Mica is evaluated). The ``acrylic*`` / ``glass*``
     tokens below are consumed by the standalone Visual V0 lab page only, where
     the real-time Acrylic direction is evaluated before any global adoption.
+
+    The ``glassSpecular*`` / ``glassEdgeLight*`` / ``glassInnerShadow*`` tokens
+    implement the iOS 26 "Liquid Glass" layer stack (research-backed, see
+    AcrylicSurface.qml header): backdrop blur + tint + saturation/vibrancy
+    boost + diagonal specular highlight + top/left edge light + bottom/right
+    inner shadow + noise grain. Light mode is deliberately brighter and more
+    saturated (matte & bright) so the material still reads on a light canvas;
+    dark mode is deeper and more contrasty.
     """
     if theme_name == "paper":
         return {
@@ -40,8 +48,19 @@ def _material(theme_name: str) -> dict[str, str]:
             "glassTintBalanced": "0.78",
             "glassTintPremium": "0.42",
             "glassTintOpacity": "0.62",
-            "glassSaturation": "0.0",
+            "glassSaturation": "0.15",
             "glassBrightness": "0.03",
+            "glassSpecularBalanced": "0.16",
+            "glassSpecularPremium": "0.30",
+            "glassEdgeLightBalanced": "0.26",
+            "glassEdgeLightPremium": "0.48",
+            "glassInnerShadowBalanced": "0.14",
+            "glassInnerShadowPremium": "0.28",
+            # Backdrop glow strength: light mode needs noticeably richer color
+            # fields so the blur+tint stack has color to transmit (iOS Liquid
+            # Glass only reads over visually rich backgrounds).
+            "backdropGlowWarm": "0.10",
+            "backdropGlowCool": "0.09",
         }
     if theme_name == "dark":
         return {
@@ -58,8 +77,16 @@ def _material(theme_name: str) -> dict[str, str]:
             "glassTintBalanced": "0.78",
             "glassTintPremium": "0.42",
             "glassTintOpacity": "0.62",
-            "glassSaturation": "0.0",
+            "glassSaturation": "0.20",
             "glassBrightness": "0.08",
+            "glassSpecularBalanced": "0.13",
+            "glassSpecularPremium": "0.26",
+            "glassEdgeLightBalanced": "0.22",
+            "glassEdgeLightPremium": "0.40",
+            "glassInnerShadowBalanced": "0.20",
+            "glassInnerShadowPremium": "0.36",
+            "backdropGlowWarm": "0.12",
+            "backdropGlowCool": "0.11",
         }
     return {
         "glassFill": "#CCFFFFFF",
@@ -68,16 +95,26 @@ def _material(theme_name: str) -> dict[str, str]:
         "glassBorderShadow": "#33E4E6E8",
         "paperFill": "#FFFFFF",
         "noiseOpacity": "0.02",
-        "acrylicTint": "#FFFFFF",
-        "acrylicLuminosity": "0.04",
+        # Light-mode Liquid Glass is matte & bright but slightly cool so the
+        # panel separates from the warm paper canvas instead of washing out.
+        "acrylicTint": "#F5F8FB",
+        "acrylicLuminosity": "0.06",
         "glassBlurBalanced": "12",
         "glassBlurPremium": "56",
-        "glassTintBalanced": "0.78",
-        "glassTintPremium": "0.42",
+        "glassTintBalanced": "0.72",
+        "glassTintPremium": "0.52",
         "glassTintOpacity": "0.62",
-        "glassSaturation": "-0.1",
-        "glassBrightness": "0.12",
-    }
+        "glassSaturation": "0.40",
+        "glassBrightness": "0.05",
+            "glassSpecularBalanced": "0.26",
+            "glassSpecularPremium": "0.52",
+            "glassEdgeLightBalanced": "0.40",
+            "glassEdgeLightPremium": "0.68",
+            "glassInnerShadowBalanced": "0.16",
+            "glassInnerShadowPremium": "0.32",
+            "backdropGlowWarm": "0.22",
+            "backdropGlowCool": "0.19",
+        }
 
 
 def _elevation() -> dict[str, str]:

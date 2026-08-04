@@ -10,6 +10,8 @@ Outputs (diagnosis doc §14):
     visual-v0-rework-premium.png
     visual-v0-rework-paper.png
     visual-v0-rework-dark.png
+    visual-v0-rework-light-balanced.png
+    visual-v0-rework-light-premium.png
     visual-v0-rework-resized.png
 
 Before every capture the script asserts the full-window backdrop coverage and
@@ -68,11 +70,6 @@ def _assert_clean_window(window: QQuickWindow, image: QImage, label: str) -> Non
     """Diagnosis doc 13.1/13.2: backdrop covers the window; no black holes."""
     backdrop = _find_item(window.contentItem(), "labBackgroundLayer")
     assert backdrop is not None, f"{label}: backdrop missing"
-    assert backdrop.x() == 0 and backdrop.y() == 0, f"{label}: backdrop offset"
-    assert (
-        abs(backdrop.width() - float(window.width())) < 1
-        and abs(backdrop.height() - float(window.height())) < 1
-    ), f"{label}: backdrop does not cover the window"
 
     # True bare regions are pure black (unpainted canvas). The dark theme's
     # canvas is #202124 (brightness ~36), which must NOT be flagged.
@@ -83,6 +80,18 @@ def _assert_clean_window(window: QQuickWindow, image: QImage, label: str) -> Non
             if max(c.red(), c.green(), c.blue()) < 12:
                 dark += 1
     assert dark == 0, f"{label}: {dark} pure-black sampled pixels"
+
+
+def _backdrop_covers(window: QQuickWindow) -> bool:
+    backdrop = _find_item(window.contentItem(), "labBackgroundLayer")
+    if backdrop is None:
+        return False
+    return (
+        backdrop.x() == 0
+        and backdrop.y() == 0
+        and abs(backdrop.width() - float(window.width())) < 1
+        and abs(backdrop.height() - float(window.height())) < 1
+    )
 
 
 def main() -> int:
@@ -109,6 +118,13 @@ def main() -> int:
         if size is not None:
             root.resize(*size)
         _pump(app, 12)
+        # Windowed resize is applied by the window manager asynchronously;
+        # wait (bounded) until the backdrop covers the window before grabbing.
+        for _ in range(30):
+            if _backdrop_covers(root):
+                break
+            _pump(app, 1)
+        assert _backdrop_covers(root), f"{filename}: backdrop never covered window"
         image = root.grabWindow()
         _assert_clean_window(root, image, filename)
         path = OUT_DIR / filename
@@ -121,6 +137,11 @@ def main() -> int:
     capture("paper", "premium", "visual-v0-rework-premium.png")
     capture("paper", "balanced", "visual-v0-rework-paper.png")
     capture("dark", "balanced", "visual-v0-rework-dark.png")
+    # Light theme shots: the glass direction must read on light backgrounds
+    # too (iOS Liquid Glass in light mode is matte & bright), so these are
+    # captured in every verification pass.
+    capture("light", "balanced", "visual-v0-rework-light-balanced.png")
+    capture("light", "premium", "visual-v0-rework-light-premium.png")
     capture("paper", "balanced", "visual-v0-rework-resized.png", size=(1280, 800))
 
     engine.deleteLater()

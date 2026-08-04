@@ -285,3 +285,57 @@ $env:PYTHONPATH="$tmp;C:\Users\钟子诚\.codex\worktrees\frontend-clean\src"
 - 质量档 Safe/Balanced/Premium 共享同一布局，仅改变 Blur/Noise/阴影强度；
 - 自动测试：157 passed / 35 skipped；截图脚本输出
   `visual-v0-rework-*.png` 六张并自动断言。
+
+## 12. 追加（2026-08-04）：iOS 26 Liquid Glass 层叠调研与实验页实装
+
+用户提问：能否做到 iOS 最新版（Liquid Glass）的玻璃效果；现有 Premium 在
+dark 下明显、light 下几乎看不出。本轮结论：**视觉近似可行，完全复刻不现实**。
+
+### 12.1 调研结论（网上指导汇总）
+
+- Apple HIG Materials：Liquid Glass 是动态材质，须克制使用、不要用在内容层；
+  背景较亮时可叠 35% 黑色 dim 层保证可读性。
+- UIKit（iOS 26）：`UIGlassEffect`（tintColor、isInteractive）+
+  `UIGlassContainerEffect` 的 spacing 让相邻玻璃元素融合（Qt 无直接等价）。
+- SwiftUI：`.glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))`，
+  需 iOS 26 gating + 非玻璃回退。
+- Flutter `cupertino_liquid_glass` 0.6.x：blur ≈ 40、tint ≈ 0.3；
+  **specular 斜向高光、edge lighting、inner shadow、noise grain、vibrancy
+  boost**；light = matte & bright，dark = deep & contrasty。
+- Floatica / DeepWiki：saturate(180%) 即约 +80% 饱和增强；多层 specular 与
+  shape-aware edge glow 是 Liquid Glass 与普通毛玻璃的关键区别。
+
+### 12.2 现有实现缺的四层（light 下看不出的根因）
+
+1. 无斜向 specular 高光（"sheen"）——液态感的核心；
+2. 无顶/左边缘光与底/右内阴影——厚度感；
+3. light 主题饱和度为负（-0.1）——把背景颜色洗掉；
+4. 浅色背景自身过白，blur+tint 没有颜色可透。
+
+### 12.3 本轮改动（仅实验页 VisualLab / AcrylicSurface / 主题 token）
+
+- `AcrylicSurface.qml`：新增单个静态 Canvas 一次绘制五层
+  （斜向 specular、顶/左边缘光、底/右内阴影），用既有圆角 mask 裁切；
+  Safe 档全隐藏，Balanced/Premium 强度由 token 控制（Premium 严格更强）。
+- `theme_provider.py`：新增 `glassSpecular*` / `glassEdgeLight*` /
+  `glassInnerShadow*` token；light 饱和度改为 +0.40、玻璃色调改为冷白
+  `#F5F8FB`、Premium 透明度调回 0.52；背景光晕强度 token 化
+  （`backdropGlowWarm/Cool`），light 调强（0.22/0.19）让 blur 有颜色可透。
+- 验证：前端 pytest 165 passed / 35 skipped；ruff 通过；mypy（项目配置）
+  通过；截图脚本新增 light 两档并增加 resize 后有界等待。
+
+### 12.4 像素验证摘要（真机 windowed 截图）
+
+- dark premium：面板顶缘亮度 83 vs 面板本体 41（+40），specular 上区 59 vs
+  下区 43——边缘光与高光清晰可见。
+- light premium：面板上部 ~230（偏冷蓝）vs 纸张 252，面板与纸张明显分离；
+  premium 与 balanced 仅玻璃区有差异（avg diff 2.39，纸张区 0.0）。
+
+### 12.5 已知限制与后续
+
+- 无法复刻：多玻璃容器融合（UIGlassContainerEffect）、交互折射/形态变化、
+  Fresnel rim 等，需要自定义 shader 或 WebEngine 的 WebGPU/CSS 路径，本轮不做。
+- 正式 Shell / 后端 / WebEngine 未改动；方向确认后再考虑从
+  `AcrylicSurface` 平移到正式 UI。
+- light 下玻璃的“明显程度”由背景丰富度决定，token（specular/edge/glow）
+  都可单独微调，不需要逐个按钮改魔法数字。

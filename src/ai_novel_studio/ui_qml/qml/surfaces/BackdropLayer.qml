@@ -106,7 +106,10 @@ Item {
         width: parent.width * 0.42
         height: parent.height * 0.44
         radius: parent.width * 0.21
-        color: root.tint(Theme.tokens.color.warning, 0.10)
+        color: root.tint(
+            Theme.tokens.color.warning,
+            parseFloat(Theme.tokens.material.backdropGlowWarm)
+        )
     }
 
     // Top-right cool blue-violet glow (behind the AI panel).
@@ -117,7 +120,10 @@ Item {
         width: parent.width * 0.42
         height: parent.height * 0.46
         radius: parent.width * 0.21
-        color: root.tint(Theme.tokens.agent.thinkingA, 0.09)
+        color: root.tint(
+            Theme.tokens.agent.thinkingA,
+            parseFloat(Theme.tokens.material.backdropGlowCool)
+        )
     }
 
     // Mid-lower gray-blue soft light (behind the paper bottom).

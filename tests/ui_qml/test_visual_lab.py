@@ -247,6 +247,58 @@ def test_quality_tiers_change_nav_sidebar_and_ai_glass(qtbot: QtBot) -> None:
         assert item.property("blurEnabled") is True, item.objectName()
 
 
+def test_liquid_glass_layers_follow_quality_tiers(qtbot: QtBot) -> None:
+    """iOS 26 layer stack (specular/edge light/inner shadow) is hidden in Safe,
+    active in Balanced, and stronger in Premium."""
+    _, _, theme, window = _load_lab(qtbot)
+    content = _content(window)
+    acrylic = _find_item(content, "labAcrylicSurface")
+    liquid_layers = _find_item(content, "liquidLayers")
+    liquid_mask = _find_item(content, "liquidLayersMask")
+    assert acrylic is not None
+    assert liquid_layers is not None and liquid_mask is not None
+
+    # Balanced: liquid layers active with positive strength.
+    assert theme.property("visualQuality") == "balanced"
+    assert float(acrylic.property("specularOpacity")) > 0
+    assert float(acrylic.property("edgeLightOpacity")) > 0
+    assert float(acrylic.property("innerShadowOpacity")) > 0
+    assert liquid_mask.property("visible") is True
+
+    # Safe: all liquid layers hidden and strengths zero.
+    theme.setVisualQuality("safe")
+    qtbot.waitUntil(lambda: float(acrylic.property("specularOpacity")) == 0.0)
+    assert float(acrylic.property("edgeLightOpacity")) == 0.0
+    assert float(acrylic.property("innerShadowOpacity")) == 0.0
+    assert liquid_mask.property("visible") is False
+
+    # Premium: strictly stronger than Balanced (tier separation must hold).
+    theme.setVisualQuality("balanced")
+    qtbot.wait(30)
+    balanced_specular = float(acrylic.property("specularOpacity"))
+    balanced_edge = float(acrylic.property("edgeLightOpacity"))
+    balanced_shadow = float(acrylic.property("innerShadowOpacity"))
+    theme.setVisualQuality("premium")
+    qtbot.waitUntil(
+        lambda: float(acrylic.property("specularOpacity")) > balanced_specular
+    )
+    assert float(acrylic.property("edgeLightOpacity")) > balanced_edge
+    assert float(acrylic.property("innerShadowOpacity")) > balanced_shadow
+    assert liquid_mask.property("visible") is True
+
+
+def test_light_theme_glass_uses_positive_saturation(qtbot: QtBot) -> None:
+    """Regression: light theme previously used negative saturation, which
+    washed the glass out; iOS-style vibrancy needs a positive boost."""
+    _, _, theme, window = _load_lab(qtbot)
+    acrylic = _find_item(_content(window), "labAcrylicSurface")
+    assert acrylic is not None
+    theme.setTheme("light")
+    assert float(acrylic.property("saturation")) > 0
+    theme.setTheme("dark")
+    assert float(acrylic.property("saturation")) > 0
+
+
 def test_quality_switch_keeps_layout_geometry(qtbot: QtBot) -> None:
     """Diagnosis doc 13.5: tier switches never change layout size."""
     _, _, theme, window = _load_lab(qtbot)

@@ -43,3 +43,38 @@ def test_next_theme_cycles() -> None:
 
 def test_theme_provider_is_qobject() -> None:
     assert isinstance(ThemeProvider(), QObject)
+
+
+def test_liquid_glass_tokens_per_theme_and_tier() -> None:
+    """iOS 26 Liquid Glass layer tokens: premium > balanced in every theme,
+    and light mode carries the strongest specular so the material reads on a
+    light canvas (matte & bright, per cupertino_liquid_glass guidance)."""
+    theme = ThemeProvider()
+    for name in ("paper", "light", "dark"):
+        theme.setTheme(name)
+        material = theme.property("tokens")["material"]
+        assert float(material["glassSpecularPremium"]) > float(
+            material["glassSpecularBalanced"]
+        ), f"{name}: specular premium must be stronger"
+        assert float(material["glassEdgeLightPremium"]) > float(
+            material["glassEdgeLightBalanced"]
+        ), f"{name}: edge light premium must be stronger"
+        assert float(material["glassInnerShadowPremium"]) > float(
+            material["glassInnerShadowBalanced"]
+        ), f"{name}: inner shadow premium must be stronger"
+
+    # Light theme must be visibly brighter/more saturated than dark.
+    theme.setTheme("light")
+    light = theme.property("tokens")["material"]
+    theme.setTheme("dark")
+    dark = theme.property("tokens")["material"]
+    assert float(light["glassSaturation"]) > float(dark["glassSaturation"])
+    assert float(light["glassSpecularPremium"]) > float(dark["glassSpecularPremium"])
+    assert float(light["glassEdgeLightPremium"]) > float(dark["glassEdgeLightPremium"])
+    assert float(light["glassSaturation"]) > 0
+    # Light theme must stay legible but visibly glassy on a bright canvas:
+    # the specular sheen needs real strength there, not just a token present.
+    assert float(light["glassSpecularPremium"]) >= 0.5
+    # Light mode gets richer backdrop glows so the glass has color to transmit.
+    assert float(light["backdropGlowWarm"]) > float(dark["backdropGlowWarm"])
+    assert float(light["backdropGlowCool"]) > float(dark["backdropGlowCool"])
