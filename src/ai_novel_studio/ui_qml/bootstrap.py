@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -71,6 +72,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     use_webengine = "--textarea" not in args
     args = [arg for arg in args if arg != "--textarea"]
     if use_webengine:
+        # QtWebEngine's GPU compositor on Windows can lose its D3D context
+        # during layout-driven resizes (AI dock open/close), leaving a black
+        # strip in the newly exposed editor area until the renderer recovers.
+        # Software compositing is stable for this text-only page and removes
+        # the artifact; the user can override via their own Chromium flags.
+        os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu")
         from PySide6.QtWebEngineQuick import QtWebEngineQuick
 
         ensure_editor_dist()

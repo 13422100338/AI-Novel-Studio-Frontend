@@ -234,7 +234,16 @@ export class NovelEditor {
   }
 
   applyTheme(tokens: Record<string, string>): void {
+    // Theme variables must reach the page root and the mount so that the
+    // html/body background and scrollbar tracks repaint with the editor
+    // instead of flashing the previous (or default black) canvas.
+    const root = document.documentElement;
+    const mountEl = document.getElementById("editor-mount");
     for (const [key, value] of Object.entries(tokens)) {
+      root.style.setProperty(key, value);
+      if (mountEl) {
+        mountEl.style.setProperty(key, value);
+      }
       this.view.dom.style.setProperty(key, value);
     }
   }

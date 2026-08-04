@@ -122,6 +122,7 @@ ApplicationWindow {
                 visible: window.useWebEngine
                 open: Facade.aiDrawerOpen
                 windowWidth: window.width
+                animateWidth: !window.useWebEngine
                 onClosed: Facade.toggleAiDrawer(false)
             }
 

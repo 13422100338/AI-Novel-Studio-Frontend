@@ -21,8 +21,43 @@ WebEngineView {
         offTheRecord: true
     }
 
+    // Paint the view with the editor surface color on every resize/repaint;
+    // otherwise QtWebEngine can show the default black canvas while the page
+    // re-lays out during dock open/close (C1.5).
+    backgroundColor: Theme.tokens.color.bgEditor
+
     webChannel: editorChannel
     url: webView.editorUrl
+
+    // QtWebEngine composites asynchronously: after a width change the
+    // renderer is not always notified to resize its surface, so the newly
+    // exposed strip stays black until something forces a re-composite. The
+    // nudge runs immediately (covers resizes Chromium has already processed)
+    // and again after one short timer tick (covers the delayed notification).
+    // It is a repaint trigger, not a reload (C1.5).
+    function nudgeRepaint() {
+        // The callback creates a renderer round-trip: without it the layout
+        // read is fire-and-forget and Chromium still does not re-composite
+        // the resized surface.
+        webView.runJavaScript(
+            "void(document.body.offsetHeight)",
+            function() {}
+        )
+        webView.update()
+    }
+
+    Timer {
+        id: resizeRepaintTimer
+        interval: 25
+        repeat: false
+        onTriggered: webView.nudgeRepaint()
+    }
+    onWidthChanged: {
+        if (webView.width > 0) {
+            webView.nudgeRepaint()
+            resizeRepaintTimer.restart()
+        }
+    }
 
     onLoadingChanged: function(loadRequest) {
         if (loadRequest.status === WebEngineView.LoadSucceededStatus) {

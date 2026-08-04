@@ -332,6 +332,59 @@ def test_agent_dock_open_close_and_collapse(qtbot: QtBot) -> None:
     qtbot.waitUntil(lambda: dock.property("width") == 420)
 
 
+def test_agent_dock_webengine_mode_skips_width_animation(qtbot: QtBot) -> None:
+    """C1.5: WebEngine mode must resize the dock instantly.
+
+    An animated Layout.preferredWidth resizes the WebEngineView frame by frame,
+    which repaints black edge strips next to the AI dock.
+    """
+    engine = QQmlApplicationEngine()
+    _ACTIVE_ENGINES.append(engine)
+    engine.addImportPath(str(Path(app_qml_path()).parent))
+    facade = MockNovelStudioFacade()
+    theme = ThemeProvider()
+    register_frontend_types(engine, facade, theme)
+    engine.loadData(
+        QByteArray(
+            b"""
+            import QtQuick
+            import QtQuick.Controls
+            import QtQuick.Layouts
+            import "components"
+            ApplicationWindow {
+                width: 1440
+                height: 900
+                visible: true
+                RowLayout {
+                    anchors.fill: parent
+                    AgentDock {
+                        open: Facade.aiDrawerOpen
+                        windowWidth: 1440
+                        animateWidth: false
+                        Layout.fillHeight: true
+                    }
+                }
+            }
+            """
+        ),
+        QUrl.fromLocalFile(str(Path(app_qml_path()).parent / "dock-snap-harness.qml")),
+    )
+    root = engine.rootObjects()[0]
+    assert root is not None
+    root.show()
+    qtbot.waitUntil(lambda: root.width() > 0)
+    dock = _find_quick_item(root.contentItem(), "agentDock")
+    assert dock is not None
+    assert dock.property("animateWidth") is False
+    assert dock.property("width") == 34
+
+    facade.toggleAiDrawer(True)
+    # One event-loop pass: with the Behavior disabled the width must already be
+    # the default 420 (an animated dock would still be near 34 here).
+    qtbot.wait(10)
+    assert dock.property("width") == 420
+
+
 def test_timeline_cards_stay_within_content_width(qtbot: QtBot) -> None:
     """C1.2: every Agent card right edge stays inside the timeline content area.
 

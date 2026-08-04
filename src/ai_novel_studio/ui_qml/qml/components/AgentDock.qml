@@ -16,6 +16,9 @@ Item {
     property int windowWidth: 1440
     property int currentWidth: defaultWidth
     property bool reduceMotion: Facade.reduceMotion
+    // WebEngine mode must not animate Layout.preferredWidth: a frame-by-frame
+    // resize makes the editor repaint with black edge strips (C1.5).
+    property bool animateWidth: true
     signal closed()
 
     // UI state always follows the facade; QML never assigns `open` directly.
@@ -26,6 +29,7 @@ Item {
     clip: true
 
     Behavior on Layout.preferredWidth {
+        enabled: root.animateWidth
         NumberAnimation {
             duration: root.reduceMotion ? 0 : Theme.tokens.duration.panel
             easing.type: Easing.OutCubic
