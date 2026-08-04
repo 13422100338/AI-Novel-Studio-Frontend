@@ -425,3 +425,32 @@ dark 下明显、light 下几乎看不出。本轮结论：**视觉近似可行�
 - 真机 windowed 像素：正文顶部边缘光与 AI 面板一致（dark 72.8 vs 71.2、
   light 246.7 vs 240.9），正文区域呈现玻璃质感（dark body 56、light 230，
   半透明透出背景冷调光晕）。
+
+## 16. 追加（2026-08-04）：Header 玻璃化、控制条边缘统一、资源门禁
+
+“做下一波”收尾：实验页剩余大容器统一玻璃语言，并补齐资源/几何门禁测试。
+
+### 16.1 改动
+
+- `VisualLab.qml`：Header 顶栏从实色 Rectangle 换成 `AcrylicSurface`
+  （objectName `labHeader`，`sourceItem: backgroundLayer`，radius 0），与
+  四栏共用同一材质；标题与“实验控制”按钮布局不变。
+- `ExperimentControlPanel.qml`：主体保持高不透明度（可读性优先），挂载
+  `LiquidLights`（card 级边缘光 + 内阴影），控制条与卡片/面板共享同一
+  边缘语言。
+- `AcrylicSurface.qml`：`capture` 增加 `objectName: "acrylicCapture"`，
+  供资源门禁测试直接断言。
+
+### 16.2 新增测试（4 个）
+
+- Header 为 Acrylic 且边缘强度与 AI 面板一致；
+- 隐藏面板或切到 Safe 时 `ShaderEffectSource.enabled` 关闭（玻璃 UI 文档
+  §12.1：隐藏后不得继续渲染）；
+- 窗口 resize 后所有 Acrylic `captureRect` 与面板几何保持同步（文档 §13）；
+- 实验控制条挂载统一边缘光。
+
+### 16.3 验证
+
+- 前端 pytest 171 passed / 35 skipped；ruff 通过；mypy（项目配置）通过。
+- 真机 windowed 像素：Header 透出背景冷暖光晕（dark 左 76 vs 中 41，
+  light 左 206 / 右 223），不再是实色 bgCanvas。

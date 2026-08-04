@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../surfaces"
 
 // Experiment controls for the Visual V0 rework (diagnosis doc §10).
 // This is a top fold-down control strip (the "折叠区域" option): when open,
@@ -61,6 +62,17 @@ Item {
         border.color: Theme.tokens.color.border
         border.width: 1
         radius: Theme.tokens.radius.r12
+
+        // Unified edge language with the glass panels/cards (edge light +
+        // inner shadow, no specular). The control strip stays effectively
+        // opaque for readability; only the rim matches the material system.
+        LiquidLights {
+            objectName: "controlPanelLiquidLights"
+            anchors.fill: parent
+            radius: Theme.tokens.radius.r12
+            edgeLightOpacity: parseFloat(Theme.tokens.material.cardEdgeLight)
+            innerShadowOpacity: parseFloat(Theme.tokens.material.cardInnerShadow)
+        }
     }
 
     ColumnLayout {

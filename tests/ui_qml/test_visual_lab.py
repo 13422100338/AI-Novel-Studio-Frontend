@@ -321,6 +321,82 @@ def test_four_main_panels_share_unified_edge_material(qtbot: QtBot) -> None:
     assert editor.property("sourceItem").objectName() == "labBackgroundLayer"
 
 
+def test_header_joins_unified_glass_material(qtbot: QtBot) -> None:
+    """The app header is an Acrylic surface over the same backdrop, with the
+    same edge light/inner shadow language as the four-column workspace."""
+    _, _, _, window = _load_lab(qtbot)
+    content = _content(window)
+    header = _find_item(content, "labHeader")
+    acrylic = _find_item(content, "labAcrylicSurface")
+    background = _find_item(content, "labBackgroundLayer")
+    assert header is not None and acrylic is not None and background is not None
+
+    assert header.property("elevated") is None
+    assert header.property("sourceItem").objectName() == "labBackgroundLayer"
+    lights = _find_item(header, "liquidLights")
+    assert lights is not None
+    assert abs(
+        float(lights.property("edgeLightOpacity"))
+        - float(acrylic.property("edgeLightOpacity"))
+    ) < 1e-6
+    assert abs(
+        float(lights.property("innerShadowOpacity"))
+        - float(acrylic.property("innerShadowOpacity"))
+    ) < 1e-6
+
+
+def test_acrylic_capture_turns_off_when_hidden_or_safe(qtbot: QtBot) -> None:
+    """Performance gate (glass-UI doc §12.1): the ShaderEffectSource must stop
+    rendering when a panel is hidden or the quality drops to Safe."""
+    _, _, theme, window = _load_lab(qtbot)
+    content = _content(window)
+    acrylic = _find_item(content, "labAcrylicSurface")
+    assert acrylic is not None
+    capture = _find_item(acrylic, "acrylicCapture")
+    assert capture is not None
+
+    # Balanced + visible: capture runs.
+    assert theme.property("visualQuality") == "balanced"
+    assert capture.property("enabled") is True
+
+    # Safe: capture off.
+    theme.setVisualQuality("safe")
+    qtbot.waitUntil(lambda: capture.property("enabled") is False)
+
+    # Back to balanced; hiding the panel also turns the capture off.
+    theme.setVisualQuality("balanced")
+    qtbot.waitUntil(lambda: capture.property("enabled") is True)
+    acrylic.setProperty("visible", False)
+    qtbot.waitUntil(lambda: capture.property("enabled") is False)
+
+
+def test_resize_keeps_capture_rect_in_sync(qtbot: QtBot) -> None:
+    """Glass-UI doc §13: resizing the window must keep every Acrylic capture
+    rect glued to its panel geometry (no smeared or offset blur)."""
+    _, _, _, window = _load_lab(qtbot)
+    content = _content(window)
+    acrylic = _find_item(content, "labAcrylicSurface")
+    nav = _find_item(content, "labNavRail")
+    assert acrylic is not None and nav is not None
+
+    for item in (nav, acrylic):
+        rect = item.property("captureRect")
+        assert abs(rect.width() - float(item.property("width"))) < 2
+        assert abs(rect.height() - float(item.property("height"))) < 2
+
+    window.resize(1100, 700)
+    qtbot.wait(80)
+
+    for item in (nav, acrylic):
+        rect = item.property("captureRect")
+        assert abs(rect.width() - float(item.property("width"))) < 2, (
+            f"{item.objectName()}: capture width out of sync after resize"
+        )
+        assert abs(rect.height() - float(item.property("height"))) < 2, (
+            f"{item.objectName()}: capture height out of sync after resize"
+        )
+
+
 def test_agent_cards_share_liquid_edge_lights(qtbot: QtBot) -> None:
     """Cards (TextDiff/ChangeSet/Form) share the edge light + inner shadow
     language of the glass panels; Safe hides it entirely."""
@@ -425,6 +501,25 @@ def test_experiment_panel_opens_and_closes(qtbot: QtBot) -> None:
 
     QMetaObject.invokeMethod(close_button, "clicked")
     qtbot.waitUntil(lambda: panel.property("open") is False)
+
+
+def test_experiment_panel_shares_unified_edge_lights(qtbot: QtBot) -> None:
+    """The experiment control strip carries the same faint edge light + inner
+    shadow as cards so every container shares the material language."""
+    _, _, _, window = _load_lab(qtbot)
+    content = _content(window)
+    open_button = _find_item(content, "experimentOpenButton")
+    panel = _find_item(content, "experimentControlPanel")
+    assert open_button is not None and panel is not None
+
+    QMetaObject.invokeMethod(open_button, "clicked")
+    qtbot.waitUntil(lambda: panel.property("open") is True)
+
+    lights = _find_item(panel, "controlPanelLiquidLights")
+    assert lights is not None
+    assert lights.property("visible") is True
+    assert float(lights.property("edgeLightOpacity")) > 0
+    assert float(lights.property("innerShadowOpacity")) > 0
 
 
 def test_experiment_panel_never_covers_ai_panel(qtbot: QtBot) -> None:

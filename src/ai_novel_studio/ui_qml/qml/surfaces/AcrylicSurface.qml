@@ -120,6 +120,7 @@ Item {
     // gate; the ideal-UI spec forbids idle GPU cost for unused effects).
     ShaderEffectSource {
         id: capture
+        objectName: "acrylicCapture"
         anchors.fill: parent
         sourceItem: root.sourceItem
         visible: false

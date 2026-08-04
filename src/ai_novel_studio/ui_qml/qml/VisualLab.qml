@@ -77,11 +77,15 @@ ApplicationWindow {
         anchors.fill: parent
         spacing: 0
 
-        // --- Header: only title + one entry point to the experiment drawer.
-        Rectangle {
+        // --- Header: title + one entry point to the experiment drawer. Same
+        // glass material as the four-column workspace (user feedback: every
+        // container should share the unified glass style).
+        AcrylicSurface {
+            objectName: "labHeader"
             Layout.fillWidth: true
             Layout.preferredHeight: 48
-            color: Theme.tokens.color.bgCanvas
+            sourceItem: backgroundLayer
+            radius: 0
 
             RowLayout {
                 anchors.fill: parent
