@@ -76,6 +76,11 @@ def test_visual_lab_loads_all_demo_surfaces(qtbot: QtBot) -> None:
         "labFormCard",
         "labStreamingGlow",
         "labStaticGlow",
+        "labReduceMotionButton",
+        "labGlowThinking",
+        "labGlowSuccess",
+        "labGlowError",
+        "labGlowCancelled",
         "labTheme-paper",
         "labTheme-dark",
         "labQuality-safe",
@@ -151,3 +156,54 @@ def test_visual_quality_segment_buttons_switch_quality(qtbot: QtBot) -> None:
     assert dark is not None
     QMetaObject.invokeMethod(dark, "clicked")
     qtbot.waitUntil(lambda: theme.property("themeName") == "dark")
+
+
+def test_glow_state_buttons_pin_success_error_cancelled(qtbot: QtBot) -> None:
+    _, _, _, window = _load_lab(qtbot)
+    content = _content(window)
+    glow = _find_item(content, "labStreamingGlow")
+    assert glow is not None
+
+    # Thinking: drift animation is live (blue-violet A/B).
+    assert glow.property("animationRunning") is True
+
+    success = _find_item(content, "labGlowSuccess")
+    assert success is not None
+    QMetaObject.invokeMethod(success, "clicked")
+    qtbot.waitUntil(lambda: glow.property("frameColor") == "#3E7C4F")
+    assert glow.property("animationRunning") is False
+
+    error = _find_item(content, "labGlowError")
+    assert error is not None
+    QMetaObject.invokeMethod(error, "clicked")
+    qtbot.waitUntil(lambda: glow.property("frameColor") == "#A6453F")
+
+    cancelled = _find_item(content, "labGlowCancelled")
+    assert cancelled is not None
+    QMetaObject.invokeMethod(cancelled, "clicked")
+    qtbot.waitUntil(lambda: glow.property("frameColor") == "#9A958C")
+
+    thinking = _find_item(content, "labGlowThinking")
+    assert thinking is not None
+    QMetaObject.invokeMethod(thinking, "clicked")
+    qtbot.waitUntil(lambda: glow.property("animationRunning") is True)
+
+
+def test_reduce_motion_button_toggles_glow_to_static(qtbot: QtBot) -> None:
+    _, facade, _, window = _load_lab(qtbot)
+    content = _content(window)
+    glow = _find_item(content, "labStreamingGlow")
+    toggle = _find_item(content, "labReduceMotionButton")
+    assert glow is not None and toggle is not None
+
+    assert facade.property("reduceMotion") is False
+    assert glow.property("animationRunning") is True
+
+    QMetaObject.invokeMethod(toggle, "clicked")
+    qtbot.waitUntil(lambda: facade.property("reduceMotion") is True)
+    qtbot.waitUntil(lambda: glow.property("animationRunning") is False)
+    assert glow.property("frameColor") == "#7C6FD8"  # static thinkingA
+
+    QMetaObject.invokeMethod(toggle, "clicked")
+    qtbot.waitUntil(lambda: facade.property("reduceMotion") is False)
+    qtbot.waitUntil(lambda: glow.property("animationRunning") is True)

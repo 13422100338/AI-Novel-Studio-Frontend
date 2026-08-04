@@ -14,6 +14,30 @@ cd C:\Users\钟子诚\.codex\worktrees\frontend-clean
 顶栏可实时切换主题（paper/light/dark）与质量档（Safe/Balanced/Premium）。
 正式入口 `-m ai_novel_studio.ui_qml`（默认 WebEngine）完全不受影响。
 
+### 顶栏控制
+
+- 主题：`paper / light / dark` 三段式按钮（当前项高亮）；
+- 质量：`safe / balanced / premium` 三段式按钮（当前项主色填充）；
+- 动效：`动效：开 / 关` 一键切换 `Facade.reduceMotion`（流光立即退化静态高亮）。
+
+### AI 玻璃列
+
+- 活动卡带 `StreamingGlowBorder`，下方提供流光状态演示：
+  `Thinking`（A↔B 慢速漂移）/ `Success`（定格绿）/ `Error`（定格红）/
+  `Cancelled`（定格灰），与规范 8.1 一致；
+- 状态 chip 展示 Thinking / Generating / Success / Error；
+- 主要/次要/轻量/停止按钮 + 输入框。
+
+### 正文与按钮列
+
+- `PaperSurface` 正文纸张（行距 1.8、暖白不透明）；
+- 按钮层级：主要 / 次要 / 轻量 / 已选中 / 禁用；
+- **玻璃 vs 实色材质对比**（规范 4.2：AI/壳层流动，基础表面稳定）。
+
+### Agent 卡片列
+
+- `TextDiffCard` + `StaticGlowBorder`、`ChangeSetCard`、`FormCard`。
+
 ## 2. 本轮交付
 
 ### Design Tokens 扩展（`bridge/theme_provider.py`）
@@ -77,6 +101,7 @@ Safe→不透明降级、reduceMotion→流光静态化、质量档循环与无�
 - `visual-lab-paper-safe.png`（Safe：全部降级为不透明表面）
 - `visual-lab-dark-premium.png`（深色 + 玻璃 + 噪声）
 - `visual-lab-light-safe.png`（浅色 + 实色）
+- `visual-lab-paper-glow-success.png`（Success 定格绿流光）
 
 ## 6. 下一步（待用户确认）
 

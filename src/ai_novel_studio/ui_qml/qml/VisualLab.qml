@@ -65,6 +65,13 @@ ApplicationWindow {
                 Layout.fillWidth: true
             }
 
+            AppButton {
+                objectName: "labReduceMotionButton"
+                text: Facade.reduceMotion ? "动效：关" : "动效：开"
+                ghost: true
+                onClicked: Facade.setReduceMotion(!Facade.reduceMotion)
+            }
+
             // 主题：三段式切换（paper / light / dark）
             RowLayout {
                 spacing: 4
@@ -180,10 +187,48 @@ ApplicationWindow {
                                 }
                             }
                             StreamingGlowBorder {
+                                id: streamingGlow
                                 objectName: "labStreamingGlow"
                                 anchors.fill: parent
                                 radius: Theme.tokens.radius.r12
                                 active: true
+                            }
+                        }
+
+                        // 流光状态演示（规范 8.1）：成功/错误/取消定格状态色，
+                        // 运行态 A↔B 慢速漂移；reduceMotion 退化为静态高亮。
+                        Flow {
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Text {
+                                text: "流光状态："
+                                font.pixelSize: 10
+                                color: Theme.tokens.color.textSecondary
+                            }
+                            AppButton {
+                                objectName: "labGlowThinking"
+                                text: "Thinking"
+                                ghost: true
+                                onClicked: streamingGlow.state = ""
+                            }
+                            AppButton {
+                                objectName: "labGlowSuccess"
+                                text: "Success"
+                                ghost: true
+                                onClicked: streamingGlow.state = "success"
+                            }
+                            AppButton {
+                                objectName: "labGlowError"
+                                text: "Error"
+                                ghost: true
+                                onClicked: streamingGlow.state = "error"
+                            }
+                            AppButton {
+                                objectName: "labGlowCancelled"
+                                text: "Cancelled"
+                                ghost: true
+                                onClicked: streamingGlow.state = "cancelled"
                             }
                         }
 
@@ -365,6 +410,55 @@ ApplicationWindow {
                                 font.pixelSize: 10
                                 wrapMode: Text.WordWrap
                                 color: Theme.tokens.color.textSecondary
+                            }
+
+                            // 材质层次对比：同一区域玻璃 vs 实色（规范 4.2）。
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 10
+
+                                GlassSurface {
+                                    Layout.preferredWidth: 160
+                                    Layout.fillHeight: true
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 10
+                                        Text {
+                                            text: "玻璃"
+                                            font.pixelSize: 10
+                                            font.bold: true
+                                            color: Theme.tokens.color.textPrimary
+                                        }
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: "AI / 壳层 · 流动"
+                                            font.pixelSize: 9
+                                            wrapMode: Text.WordWrap
+                                            color: Theme.tokens.color.textSecondary
+                                        }
+                                    }
+                                }
+                                FlatSurface {
+                                    Layout.preferredWidth: 160
+                                    Layout.fillHeight: true
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 10
+                                        Text {
+                                            text: "实色"
+                                            font.pixelSize: 10
+                                            font.bold: true
+                                            color: Theme.tokens.color.textPrimary
+                                        }
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: "基础表面 · 稳定"
+                                            font.pixelSize: 9
+                                            wrapMode: Text.WordWrap
+                                            color: Theme.tokens.color.textSecondary
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
