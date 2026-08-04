@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import QMetaObject, QObject, QUrl, Slot
 from PySide6.QtGui import QColor
-from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtQml import QQmlApplicationEngine, QQmlExpression
 from PySide6.QtQuick import QQuickItem, QQuickWindow
 from pytestqt.qtbot import QtBot
 
@@ -119,11 +119,10 @@ def test_visual_lab_loads_four_column_workspace(qtbot: QtBot) -> None:
         "experimentOpenButton",
         "experimentControlPanel",
         "experimentCloseButton",
-        "labSliderTemplateButton",
-        "sliderTemplateDock",
-        "glassSliderPrimary",
-        "glassSliderSteps",
-        "glassSliderDisabled",
+        "labDragSheetButton",
+        "dragSheetTemplate",
+        "dragSheetGrabber",
+        "dragSheetCloseButton",
         "labMicaToggle",
         "labDebugBackdropToggle",
         "labDebugSourceRectToggle",
@@ -642,106 +641,125 @@ def test_debug_overlay_toggles_propagate_to_window(qtbot: QtBot) -> None:
     qtbot.waitUntil(lambda: window.property("debugBlurRegion") is True)
 
 
-def _open_slider_dock(window: QQuickWindow) -> None:
-    button = _find_item(window.contentItem(), "labSliderTemplateButton")
+def _open_drag_sheet(window: QQuickWindow) -> None:
+    button = _find_item(window.contentItem(), "labDragSheetButton")
     assert button is not None
     QMetaObject.invokeMethod(button, "clicked")
 
 
-def test_slider_template_dock_opens_and_closes(qtbot: QtBot) -> None:
-    """The slider showcase folds up from the bottom like the experiment strip
-    and never needs to cover the workspace."""
+def test_drag_sheet_opens_collapsed_and_closes(qtbot: QtBot) -> None:
+    """The draggable panel opens collapsed (only the grabber + header row is
+    exposed) and closes via button or Escape."""
     _, _, _, window = _load_lab(qtbot)
     content = _content(window)
-    dock = _find_item(content, "sliderTemplateDock")
-    close_button = _find_item(content, "sliderTemplateCloseButton")
-    assert dock is not None and close_button is not None
-    assert dock.property("visible") is False
+    sheet = _find_item(content, "dragSheetTemplate")
+    close_button = _find_item(content, "dragSheetCloseButton")
+    grabber = _find_item(content, "dragSheetGrabber")
+    assert sheet is not None and close_button is not None and grabber is not None
+    assert sheet.property("visible") is False
 
-    _open_slider_dock(window)
-    qtbot.waitUntil(lambda: dock.property("visible") is True)
-    qtbot.wait(60)
+    _open_drag_sheet(window)
+    qtbot.waitUntil(lambda: sheet.property("visible") is True)
+    # Defaults to collapsed: progress 0 -> translate down by travel.
+    assert abs(float(sheet.property("progress"))) < 0.001
+    assert abs(float(sheet.property("collapsedY")) - float(sheet.property("travel"))) < 0.001
 
     QMetaObject.invokeMethod(close_button, "clicked")
-    qtbot.waitUntil(lambda: dock.property("visible") is False)
+    qtbot.waitUntil(lambda: sheet.property("visible") is False)
 
 
-def test_glass_slider_value_mapping_steps_and_clamp(qtbot: QtBot) -> None:
-    """The GlassSlider maps value to thumb 1:1, clamps out-of-range input and
-    snaps to step through one validation path (property guard)."""
+def test_drag_sheet_progress_maps_translate_one_to_one(qtbot: QtBot) -> None:
+    """progress 0/0.5/1 maps 1:1 to the panel translate (y = travel*(1-p)),
+    which is exactly how much of the panel stays visible."""
     _, facade, _, window = _load_lab(qtbot)
-    # Deterministic geometry: disable springs first, then check the 1:1 map.
-    facade.setReduceMotion(True)
-    _open_slider_dock(window)
+    facade.setReduceMotion(True)  # deterministic: no spring mid-flight
+    _open_drag_sheet(window)
     qtbot.wait(80)
-    primary = _find_item(_content(window), "glassSliderPrimary")
-    steps = _find_item(_content(window), "glassSliderSteps")
-    assert primary is not None and steps is not None
+    sheet = _find_item(_content(window), "dragSheetTemplate")
+    assert sheet is not None
 
-    # 42 of 0..100 -> normalized 0.42 and thumb centered there.
-    primary.setProperty("value", 42.0)
-    qtbot.wait(20)
-    assert abs(float(primary.property("normalized")) - 0.42) < 0.001
-    expected = (
-        float(primary.property("trackLeft"))
-        + 0.42 * float(primary.property("trackWidth"))
-    )
-    assert abs(float(primary.property("thumbCenterX")) - expected) < 0.5
-
-    # Out-of-range clamps to 100 (normalized 1.0).
-    primary.setProperty("value", 500.0)
-    qtbot.wait(20)
-    assert abs(float(primary.property("normalized")) - 1.0) < 0.001
-
-    # Step slider snaps 2150 -> 2200 (step 100), stays inside 800..4000.
-    steps.setProperty("value", 2150.0)
-    qtbot.wait(20)
-    assert abs(float(steps.property("value")) - 2200.0) < 0.001
+    travel = float(sheet.property("travel"))
+    for progress, expected_y in ((0.0, travel), (0.5, travel / 2), (1.0, 0.0)):
+        sheet.setProperty("progress", progress)
+        qtbot.wait(20)
+        assert abs(float(sheet.property("translateY")) - expected_y) < 0.5, (
+            f"progress {progress}: translate {sheet.property('translateY')} != {expected_y}"
+        )
 
 
-def test_glass_slider_disabled_and_safe_stay_functional(qtbot: QtBot) -> None:
-    """Disabled sliders refuse interaction but keep valid values; Safe tier
-    strips visuals without breaking functionality (glass-UI doc §12.3)."""
-    _, _, theme, window = _load_lab(qtbot)
-    _open_slider_dock(window)
+def test_drag_sheet_set_progress_clamps(qtbot: QtBot) -> None:
+    """Programmatic progress is clamped into 0..1 through the setProgress path
+    (glass-UI doc §12.3: functionality must not depend on visuals)."""
+    _, _, _, window = _load_lab(qtbot)
+    _open_drag_sheet(window)
     qtbot.wait(80)
-    disabled = _find_item(_content(window), "glassSliderDisabled")
-    primary = _find_item(_content(window), "glassSliderPrimary")
-    assert disabled is not None and primary is not None
+    sheet = _find_item(_content(window), "dragSheetTemplate")
+    assert sheet is not None
 
-    assert disabled.property("interactive") is False
-    assert abs(float(disabled.property("value")) - 60.0) < 0.001
-
-    theme.setVisualQuality("safe")
-    qtbot.wait(40)
-    primary.setProperty("value", 30.0)
+    sheet.setProperty("progress", 2.5)
     qtbot.wait(20)
-    assert abs(float(primary.property("normalized")) - 0.30) < 0.001
+    assert abs(float(sheet.property("progress")) - 1.0) < 0.001
+    sheet.setProperty("progress", -1.0)
+    qtbot.wait(20)
+    assert abs(float(sheet.property("progress"))) < 0.001
 
 
-def test_glass_slider_respects_reduce_motion(qtbot: QtBot) -> None:
-    """Facade.reduceMotion disables the spring/behavior layer so the slider
-    stays crisp and static (apple-design §14)."""
+def test_drag_sheet_snap_target_logic(qtbot: QtBot) -> None:
+    """Release snaps to the nearest tier, boosted by fling direction:
+    upward fling jumps a tier, downward fling drops one."""
+    engine, _, _, window = _load_lab(qtbot)
+    _open_drag_sheet(window)
+    qtbot.wait(80)
+    sheet = _find_item(_content(window), "dragSheetTemplate")
+    assert sheet is not None
+
+    def snap(progress: float, velocity: float) -> float:
+        expression = QQmlExpression(
+            engine.rootContext(),
+            sheet,
+            f"snapTarget({progress}, {velocity})",
+        )
+        result = expression.evaluate()
+        assert result is not None and result[0] is not None, (
+            f"snapTarget evaluation failed: {result}"
+        )
+        return float(result[0])
+
+    # Nearest tier without fling.
+    assert abs(snap(0.1, 0.0) - 0.0) < 0.001
+    assert abs(snap(0.4, 0.0) - 0.5) < 0.001
+    assert abs(snap(0.9, 0.0) - 1.0) < 0.001
+    # Upward fling (negative velocity) jumps to the next tier.
+    assert abs(snap(0.1, -150.0) - 0.5) < 0.001
+    assert abs(snap(0.4, -150.0) - 1.0) < 0.001
+    # Downward fling (positive velocity) drops a tier.
+    assert abs(snap(0.9, 150.0) - 0.5) < 0.001
+    assert abs(snap(0.6, 150.0) - 0.0) < 0.001
+
+
+def test_drag_sheet_respects_reduce_motion(qtbot: QtBot) -> None:
+    """Facade.reduceMotion disables the snap spring so the panel stays crisp
+    and static (apple-design §14)."""
     _, facade, _, window = _load_lab(qtbot)
-    _open_slider_dock(window)
+    _open_drag_sheet(window)
     qtbot.wait(80)
-    primary = _find_item(_content(window), "glassSliderPrimary")
-    assert primary is not None
+    sheet = _find_item(_content(window), "dragSheetTemplate")
+    assert sheet is not None
 
-    assert primary.property("springEnabled") is True
+    assert bool(sheet.property("springEnabled")) is True
     facade.setReduceMotion(True)
-    qtbot.waitUntil(lambda: primary.property("springEnabled") is False)
+    qtbot.waitUntil(lambda: bool(sheet.property("springEnabled")) is False)
 
 
-def test_slider_dock_shares_unified_edge_lights(qtbot: QtBot) -> None:
-    """The showcase dock carries the same faint edge light + inner shadow as
+def test_drag_sheet_shares_unified_edge_lights(qtbot: QtBot) -> None:
+    """The draggable panel carries the same faint edge light + inner shadow as
     cards so every container keeps the shared material language."""
     _, _, _, window = _load_lab(qtbot)
-    _open_slider_dock(window)
+    _open_drag_sheet(window)
     qtbot.wait(80)
-    dock = _find_item(_content(window), "sliderTemplateDock")
-    assert dock is not None
-    lights = _find_item(dock, "sliderDockLiquidLights")
+    sheet = _find_item(_content(window), "dragSheetTemplate")
+    assert sheet is not None
+    lights = _find_item(sheet, "dragSheetLiquidLights")
     assert lights is not None
     assert lights.property("visible") is True
     assert float(lights.property("edgeLightOpacity")) > 0

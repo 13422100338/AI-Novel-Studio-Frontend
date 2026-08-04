@@ -40,7 +40,7 @@ ApplicationWindow {
     font.family: Theme.tokens.font.ui
 
     property bool experimentOpen: false
-    property bool templateDockOpen: false
+    property bool dragSheetOpen: false
     property bool debugBackdrop: false
     property bool debugSourceRect: false
     property bool debugBlurRegion: false
@@ -109,11 +109,11 @@ ApplicationWindow {
                     onClicked: root.experimentOpen = true
                 }
                 AppButton {
-                    objectName: "labSliderTemplateButton"
-                    text: "滑动条范本"
+                    objectName: "labDragSheetButton"
+                    text: "拖拽面板范本"
                     ghost: true
-                    selected: root.templateDockOpen
-                    onClicked: root.templateDockOpen = !root.templateDockOpen
+                    selected: root.dragSheetOpen
+                    onClicked: root.dragSheetOpen = !root.dragSheetOpen
                 }
             }
         }
@@ -538,17 +538,20 @@ ApplicationWindow {
             }
         }
 
-        // --- Slider template dock: folds up from the bottom so it never
-        // covers the workspace (same pattern as the experiment strip).
-        SliderTemplateDock {
-            id: sliderTemplateDock
-            objectName: "sliderTemplateDock"
-            Layout.fillWidth: true
-            Layout.preferredHeight:
-                root.templateDockOpen ? sliderTemplateDock.implicitHeight : 0
-            clip: true
-            visible: root.templateDockOpen
-            onClosed: root.templateDockOpen = false
-        }
+    }
+
+    // --- DragSheet: the "上下划动窗口的条" template. Floating over the
+    // workspace bottom (iOS sheet style), draggable via its grabber. It is
+    // declared after the ColumnLayout so it stacks on top; collapsed by
+    // default shows only the header row.
+    DragSheet {
+        id: dragSheet
+        objectName: "dragSheetTemplate"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        visible: root.dragSheetOpen
+        title: "上下划动窗口 · DragSheet 范本"
+        onClosed: root.dragSheetOpen = false
     }
 }

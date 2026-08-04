@@ -484,6 +484,62 @@ review-animations 对成品做自审（结论见 17.4）。
 **Verdict: Approve**——全部动效 ≤180ms、仅 transform/opacity、手势弹簧可打断、
 reduceMotion 完整降级、无 scale(0)/ease-in、工具条关闭无动画。
 
+## 18. 追加（2026-08-04）：方向纠正——上下划动窗口的条（DragSheet）
+
+用户指出 §17 理解错了：要的是“上下划动窗口的条”（iOS 底部 sheet / 控制中心
+式、带抓手条、可上下拖动展开收起的面板），不是横向滑块。本轮：
+
+### 18.1 结构改动
+
+- 删除 `GlassSlider.qml`、`SliderTemplateDock.qml` 及两张旧截图；
+  qmldir 改注册 `DragSheet`。
+- 新增 `DragSheet.qml`：底部浮出的玻璃面板（半透明底 + LiquidLights 边缘，
+  顶部 16 圆角），顶部是 36×4 的 grabber 圆条 + 标题行，整条 header 可拖。
+  - 拖动：指针按下即记录起点，移动时面板 1:1 跟随（`setFromPointer`）；
+  - 吸附：松手按“位置最近档 + 甩动速度”落到 收起(0) / 预览(0.5) / 展开(1)，
+    向上甩跳一档、向下甩退一档（`snapTarget`，momentum 简化版）；
+  - 弹簧：吸附用可打断 `SpringAnimation`（spring 2.4 / damping 0.86），
+    拖动中禁用保证跟手；只用 `transform.translate`（GPU 友好）；
+  - 橡皮筋：拖过上下边界时位移阻尼减半，松手弹回档位；
+  - reduceMotion：吸附瞬间完成；Safe/Balanced/Premium 均可拖动。
+- `VisualLab.qml`：Header 按钮改为“拖拽面板范本”（`labDragSheetButton`），
+  DragSheet 悬浮于窗口底部（声明在 ColumnLayout 之后），Escape / 按钮关闭。
+- 截图脚本新增展开（paper）与收起（dark）两张范本图。
+
+### 18.2 实现中发现并修复的三个真实坑
+
+1. **`Facade === null` 恒为 true**：QML 里把上下文属性对象与 `=== null`
+   比较，PySide6 包装的 QObject 恒判等，导致 `springEnabled` 被静默禁用。
+   改为只用 `typeof Facade === "undefined"` 判断（实验脚本实测确认）。
+2. **Theme token 字符串取 `.r` 得 undefined**：`Qt.rgba(undefined,…)`
+   静默产生纯黑——DragSheet 面板一度整块黑（截图脚本 6~36 个黑像素告警）。
+   修复：先声明 `property color glassColor: Theme.tokens.color.bgSurface`，
+   再取分量（BackdropLayer 注释里同样警示过的坑）。
+3. **PySide6 读 QML bool 返回 float**：测试里 `property("springEnabled")
+   is False` 恒失败（读回 0.0），统一用 `bool(...)` 断言。
+
+### 18.3 review-animations 自审
+
+| Before（朴素基线） | After（本轮实现） | Why |
+| --- | --- | --- |
+| 面板直接显隐 | grabber 拖动 1:1 跟随 | 直接操作：内容与指针同步（apple §2） |
+| 松手就近落点 | 位置 + 甩动速度双判据吸附 | 甩动应投影到目标（momentum） |
+| 硬边界卡死 | 越界阻尼减半（橡皮筋） | 真实物体先减速再停（apple §9） |
+| 固定时长动画 | 可打断 SpringAnimation | 拖动中随时反向无断档（apple §3） |
+| 改 width/height | 仅 transform.translate | 只动合成属性，不触发布局 |
+| 直接读 Facade | typeof 守卫 | `=== null` 恒真坑（§18.2） |
+
+**Verdict: Approve**——1:1 跟手、弹簧可打断、橡皮筋阻尼、仅 transform、
+reduceMotion 降级、无黑块；工具条关闭无动画（高频动作）。
+
+### 18.4 验证
+
+- 前端 pytest 177 passed / 35 skipped（新增/替换 7 个 DragSheet 测试：开关、
+  progress↔translate 1:1、clamp、snapTarget 逻辑、reduceMotion、边缘光）；
+  ruff 通过；mypy（项目配置）通过。
+- 真机 windowed 截图：展开（paper）与收起（dark）两张，底部区域 0 黑像素；
+  grabber 行亮度正常（paper 亮 / dark 灰条可见）。
+
 ## 16. 追加（2026-08-04）：Header 玻璃化、控制条边缘统一、资源门禁
 
 “做下一波”收尾：实验页剩余大容器统一玻璃语言，并补齐资源/几何门禁测试。

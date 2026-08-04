@@ -144,16 +144,24 @@ def main() -> int:
     capture("light", "premium", "visual-v0-rework-light-premium.png")
     capture("paper", "balanced", "visual-v0-rework-resized.png", size=(1280, 800))
 
-    # Slider template showcase (dock folds up from the bottom).
-    def capture_slider_template(theme_name: str, filename: str) -> None:
+    # DragSheet showcase: the "上下划动窗口的条" template (bottom sheet with a
+    # grabber). Captures both the expanded and the collapsed (grabber-only)
+    # states.
+    def capture_drag_sheet(
+        theme_name: str,
+        filename: str,
+        progress: float,
+    ) -> None:
         theme.setTheme(theme_name)
         theme.setVisualQuality("premium")
-        button = _find_item(root.contentItem(), "labSliderTemplateButton")
-        assert button is not None, f"{filename}: slider template button missing"
-        dock = _find_item(root.contentItem(), "sliderTemplateDock")
-        if dock is None or dock.property("visible") is not True:
+        button = _find_item(root.contentItem(), "labDragSheetButton")
+        assert button is not None, f"{filename}: drag sheet button missing"
+        sheet = _find_item(root.contentItem(), "dragSheetTemplate")
+        if sheet is None or sheet.property("visible") is not True:
             QMetaObject.invokeMethod(button, "clicked")
-        _pump(app, 16)  # stagger entrance (180ms + 3x40ms) settles
+        _pump(app, 8)
+        sheet.setProperty("progress", progress)
+        _pump(app, 16)  # snap spring settles
         assert _backdrop_covers(root), f"{filename}: backdrop never covered window"
         image = root.grabWindow()
         _assert_clean_window(root, image, filename)
@@ -161,8 +169,8 @@ def main() -> int:
         assert image.save(str(path)), f"failed to save {path}"
         print(f"saved {path}")
 
-    capture_slider_template("paper", "visual-v0-rework-slider-template.png")
-    capture_slider_template("dark", "visual-v0-rework-slider-template-dark.png")
+    capture_drag_sheet("paper", "visual-v0-rework-drag-sheet.png", 1.0)
+    capture_drag_sheet("dark", "visual-v0-rework-drag-sheet-dark.png", 0.0)
 
     engine.deleteLater()
     return 0
