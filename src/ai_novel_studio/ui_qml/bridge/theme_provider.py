@@ -33,11 +33,15 @@ def _material(theme_name: str) -> dict[str, str]:
             # Real-time acrylic (Visual V0 lab only):
             "acrylicTint": "#FBF8F0",
             "acrylicLuminosity": "0.035",
-            "glassBlurBalanced": "24",
-            "glassBlurPremium": "40",
+            # Tier separation: Balanced = light blur + more solid tint,
+            # Premium = strong blur + more transparent tint (visibly distinct).
+            "glassBlurBalanced": "12",
+            "glassBlurPremium": "56",
+            "glassTintBalanced": "0.78",
+            "glassTintPremium": "0.42",
             "glassTintOpacity": "0.62",
             "glassSaturation": "0.0",
-            "glassBrightness": "0.0",
+            "glassBrightness": "0.03",
         }
     if theme_name == "dark":
         return {
@@ -49,11 +53,13 @@ def _material(theme_name: str) -> dict[str, str]:
             "noiseOpacity": "0.035",
             "acrylicTint": "#292A2D",
             "acrylicLuminosity": "0.05",
-            "glassBlurBalanced": "24",
-            "glassBlurPremium": "40",
+            "glassBlurBalanced": "12",
+            "glassBlurPremium": "56",
+            "glassTintBalanced": "0.78",
+            "glassTintPremium": "0.42",
             "glassTintOpacity": "0.62",
             "glassSaturation": "0.0",
-            "glassBrightness": "0.0",
+            "glassBrightness": "0.08",
         }
     return {
         "glassFill": "#CCFFFFFF",
@@ -64,11 +70,13 @@ def _material(theme_name: str) -> dict[str, str]:
         "noiseOpacity": "0.02",
         "acrylicTint": "#FFFFFF",
         "acrylicLuminosity": "0.04",
-        "glassBlurBalanced": "24",
-        "glassBlurPremium": "40",
+        "glassBlurBalanced": "12",
+        "glassBlurPremium": "56",
+        "glassTintBalanced": "0.78",
+        "glassTintPremium": "0.42",
         "glassTintOpacity": "0.62",
         "glassSaturation": "-0.1",
-        "glassBrightness": "0.1",
+        "glassBrightness": "0.12",
     }
 
 

@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import QMetaObject, QUrl
+from PySide6.QtCore import QMetaObject, QObject, QUrl, Slot
 from PySide6.QtGui import QColor
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickItem, QQuickWindow
@@ -17,6 +17,19 @@ from ai_novel_studio.ui_qml.bridge.mock_novel_studio_facade import MockNovelStud
 from ai_novel_studio.ui_qml.bridge.theme_provider import ThemeProvider
 
 _ACTIVE_ENGINES: list[QQmlApplicationEngine] = []
+
+
+class _BackdropStub(QObject):
+    """Test stub: DWM system backdrop always unavailable (safe fallback)."""
+
+    def __init__(self, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self.calls: list[str] = []
+
+    @Slot(str, result=bool)
+    def apply(self, kind: str) -> bool:
+        self.calls.append(kind)
+        return False
 
 
 @pytest.fixture(autouse=True)
@@ -45,6 +58,7 @@ def _load_lab(
     facade = MockNovelStudioFacade()
     theme = ThemeProvider()
     register_frontend_types(engine, facade, theme)
+    engine.rootContext().setContextProperty("BackdropBridge", _BackdropStub())
     engine.load(QUrl.fromLocalFile(str(visual_lab_qml_path())))
     assert engine.rootObjects(), "VisualLab.qml failed to load"
     window = engine.rootObjects()[0]
@@ -189,6 +203,8 @@ def test_visual_quality_degrades_acrylic_to_opaque_and_disables_blur(
     assert theme.property("visualQuality") == "balanced"
     assert acrylic.property("blurEnabled") is True
     assert acrylic.property("effectActive") is True
+    # Acrylic tint: #FBF8F0 at glassTintBalanced 0.78 -> alpha ~0xC7.
+    _assert_color_approx(acrylic.property("fillColor"), "#C7FBF8F0")
 
     theme.setVisualQuality("safe")
     qtbot.waitUntil(lambda: acrylic.property("blurEnabled") is False)
@@ -198,6 +214,37 @@ def test_visual_quality_degrades_acrylic_to_opaque_and_disables_blur(
     theme.setVisualQuality("premium")
     qtbot.waitUntil(lambda: acrylic.property("blurEnabled") is True)
     assert acrylic.property("effectActive") is True
+    # Premium uses a much thinner tint (0.42 -> alpha ~0x6B) + stronger blur.
+    _assert_color_approx(acrylic.property("fillColor"), "#6BFBF8F0")
+    assert float(acrylic.property("blurMax")) == 56
+
+
+def test_quality_tiers_change_nav_sidebar_and_ai_glass(qtbot: QtBot) -> None:
+    """All three glass columns (nav, sidebar, AI) must respond to tiers."""
+    _, _, theme, window = _load_lab(qtbot)
+    content = _content(window)
+    nav = _find_item(content, "labNavRail")
+    sidebar = _find_item(content, "labChapterSidebar")
+    acrylic = _find_item(content, "labAcrylicSurface")
+    assert nav is not None and sidebar is not None and acrylic is not None
+
+    # Balanced: blur on for all three.
+    assert theme.property("visualQuality") == "balanced"
+    for item in (nav, sidebar, acrylic):
+        assert item.property("blurEnabled") is True, item.objectName()
+
+    # Safe: blur off and opaque fill for all three.
+    theme.setVisualQuality("safe")
+    qtbot.waitUntil(lambda: nav.property("blurEnabled") is False)
+    for item in (nav, sidebar, acrylic):
+        assert item.property("blurEnabled") is False, item.objectName()
+        assert _qcolor(item.property("fillColor")).name() == "#fbf8f0"
+
+    # Premium: blur on again.
+    theme.setVisualQuality("premium")
+    qtbot.waitUntil(lambda: nav.property("blurEnabled") is True)
+    for item in (nav, sidebar, acrylic):
+        assert item.property("blurEnabled") is True, item.objectName()
 
 
 def test_quality_switch_keeps_layout_geometry(qtbot: QtBot) -> None:
@@ -336,6 +383,57 @@ def test_mica_experiment_defaults_off(qtbot: QtBot) -> None:
     _, _, _, window = _load_lab(qtbot)
     assert window.property("systemBackdrop") is False
     assert window.property("micaActive") is False
+
+
+def test_mica_failure_keeps_window_opaque(qtbot: QtBot) -> None:
+    """When DWM rejects the backdrop, the window must stay opaque."""
+    _, _, _, window = _load_lab(qtbot)
+    content = _content(window)
+    open_button = _find_item(content, "experimentOpenButton")
+    mica_toggle = _find_item(content, "labMicaToggle")
+    assert open_button is not None and mica_toggle is not None
+
+    QMetaObject.invokeMethod(open_button, "clicked")
+    qtbot.waitUntil(
+        lambda: _find_item(content, "experimentControlPanel").property("open") is True
+    )
+    QMetaObject.invokeMethod(mica_toggle, "clicked")
+    qtbot.wait(60)
+
+    # The stub returns False: window must remain opaque and backdrop off.
+    assert window.property("systemBackdrop") is False
+    assert window.property("micaActive") is False
+    assert _qcolor(window.property("color")).alpha() == 255
+
+
+def test_debug_overlay_toggles_propagate_to_window(qtbot: QtBot) -> None:
+    """Experiment strip toggles must actually drive the window's overlays."""
+    _, _, _, window = _load_lab(qtbot)
+    content = _content(window)
+    open_button = _find_item(content, "experimentOpenButton")
+    backdrop_toggle = _find_item(content, "labDebugBackdropToggle")
+    source_toggle = _find_item(content, "labDebugSourceRectToggle")
+    blur_toggle = _find_item(content, "labDebugBlurRegionToggle")
+    assert open_button is not None
+    assert backdrop_toggle is not None and source_toggle is not None
+    assert blur_toggle is not None
+
+    QMetaObject.invokeMethod(open_button, "clicked")
+    qtbot.waitUntil(
+        lambda: _find_item(content, "experimentControlPanel").property("open") is True
+    )
+
+    assert window.property("debugBackdrop") is False
+    QMetaObject.invokeMethod(backdrop_toggle, "clicked")
+    qtbot.waitUntil(lambda: window.property("debugBackdrop") is True)
+
+    assert window.property("debugSourceRect") is False
+    QMetaObject.invokeMethod(source_toggle, "clicked")
+    qtbot.waitUntil(lambda: window.property("debugSourceRect") is True)
+
+    assert window.property("debugBlurRegion") is False
+    QMetaObject.invokeMethod(blur_toggle, "clicked")
+    qtbot.waitUntil(lambda: window.property("debugBlurRegion") is True)
 
 
 def test_streaming_glow_degrades_with_reduce_motion(qtbot: QtBot) -> None:

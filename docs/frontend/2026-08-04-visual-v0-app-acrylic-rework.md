@@ -178,6 +178,35 @@ visual-v0-rework-resized.png
 ruff / mypy 通过；六张 `visual-v0-rework-*.png` 重新生成并通过全窗口
 覆盖 + 无纯黑断言。
 
+### 10.3 追加（2026-08-04）：四类真机反馈修复
+
+真机反馈与修复：
+
+1. **只有 AI 栏随档位变化** → 导航轨、章节栏改为 `AcrylicSurface`
+   （`labNavRail` / `labChapterSidebar`，`sourceItem: backgroundLayer`），
+   三档现在同时作用于导航轨、章节栏、AI 面板；正文 PaperSurface 保持
+   不透明（设计如此）。新增
+   `test_quality_tiers_change_nav_sidebar_and_ai_glass`。
+2. **Balanced 与 Premium 看不出区别** → 根因是 tint 基色（#FBF8F0）与
+   背景几乎同色，alpha 差异被稀释；且 AI 面板下方背景缺少可辨认内容，
+   blur 强弱无参照。修复：
+   - 档位差距拉大：Blur 12 vs 56，tint 0.78 vs 0.42，Premium 微提亮；
+   - BackdropLayer 在 AI 面板后方新增「可辨认手稿块 + 暖色点缀」，
+     让 Premium（更透）能看到被模糊的背景内容，Balanced（更实）接近
+     半透明面板（像素验证：AI 面板空带高频能量 Safe 0 / Balanced 0.35 /
+     Premium 0.94，档位差异可测）。
+3. **Mica 开关导致背景变黑** → `requestMica()` 失败时仍发送
+   `micaChanged(true)`，窗口被无条件设为透明。修复：仅当
+   `BackdropBridge.apply()` 返回成功才切透明；失败保持不透明、开关弹回
+   关闭并显示「不可用」。新增 `test_mica_failure_keeps_window_opaque`。
+4. **三个调试开关无效果** → 面板内点击只改了面板自身属性，单向绑定
+   传不回 VisualLab。修复：新增 `debugBackdropToggled` /
+   `debugSourceRectToggled` / `debugBlurRegionToggled` 信号回传。
+   新增 `test_debug_overlay_toggles_propagate_to_window`。
+
+验证：前端 pytest 162 passed / 35 skipped；c9a2 集成 238 passed；
+ruff / mypy 通过；六张截图重新生成并通过断言。
+
 ## 11. 是否建议接入正式 Shell
 
 暂不接入。先由用户在真机确认本版应用内 Acrylic 视觉与稳定性；通过后再按

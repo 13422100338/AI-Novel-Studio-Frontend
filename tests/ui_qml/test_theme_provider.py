@@ -14,8 +14,10 @@ def test_default_theme_is_paper() -> None:
     assert tokens["duration"]["panelFade"] == 140
     assert tokens["color"]["scrim"] == "#80000000"
     material = tokens["material"]
-    assert material["glassBlurBalanced"] == "24"
-    assert material["glassBlurPremium"] == "40"
+    assert material["glassBlurBalanced"] == "12"
+    assert material["glassBlurPremium"] == "56"
+    assert material["glassTintBalanced"] == "0.78"
+    assert material["glassTintPremium"] == "0.42"
     assert material["glassTintOpacity"] == "0.62"
     assert material["acrylicTint"] == "#FBF8F0"
 

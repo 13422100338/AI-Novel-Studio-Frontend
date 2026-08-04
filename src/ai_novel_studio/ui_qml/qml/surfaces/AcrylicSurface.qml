@@ -46,7 +46,13 @@ Item {
             : Qt.rgba(tintBase.r, tintBase.g, tintBase.b, root.tintOpacity)
 
     property color tintBase: Theme.tokens.material.acrylicTint
-    property real tintOpacity: parseFloat(Theme.tokens.material.glassTintOpacity)
+    // Tier separation: Balanced keeps a more solid tint (glass reads as
+    // "frosted"), Premium uses a thinner tint so the stronger blur and the
+    // backdrop colors show through more.
+    property real tintOpacity:
+        Theme.visualQuality === "premium"
+            ? parseFloat(Theme.tokens.material.glassTintPremium)
+            : parseFloat(Theme.tokens.material.glassTintBalanced)
     property real blurMax:
         Theme.visualQuality === "premium"
             ? parseFloat(Theme.tokens.material.glassBlurPremium)

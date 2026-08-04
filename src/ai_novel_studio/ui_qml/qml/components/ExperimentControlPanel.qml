@@ -22,6 +22,9 @@ Item {
     property string renderBackend: "unknown"
     signal closed()
     signal micaChanged(bool enabled)
+    signal debugBackdropToggled(bool enabled)
+    signal debugSourceRectToggled(bool enabled)
+    signal debugBlurRegionToggled(bool enabled)
 
     implicitHeight: body.implicitHeight + 24
 
@@ -35,7 +38,16 @@ Item {
         root.micaStatus = enable
             ? (ok ? "Mica 已启用（真机确认）" : "不可用（本机不支持/离屏）")
             : "未启用"
-        root.micaChanged(enable)
+        // Only switch the window to transparent when DWM actually accepted
+        // the backdrop. On failure the window must stay opaque (no black
+        // bare regions) and the toggle snaps back to off.
+        if (ok) {
+            root.micaExperiment = true
+            root.micaChanged(true)
+        } else {
+            root.micaExperiment = false
+            root.micaChanged(false)
+        }
         return ok
     }
 
@@ -131,10 +143,7 @@ Item {
                 objectName: "labMicaToggle"
                 text: root.micaExperiment ? "Mica：开" : "Mica：关（默认）"
                 primary: root.micaExperiment
-                onClicked: {
-                    root.micaExperiment = !root.micaExperiment
-                    root.requestMica(root.micaExperiment)
-                }
+                onClicked: root.requestMica(!root.micaExperiment)
             }
             Text {
                 text: root.micaStatus
@@ -148,19 +157,28 @@ Item {
                 objectName: "labDebugBackdropToggle"
                 text: root.debugBackdrop ? "背景原图：显示" : "背景原图：隐藏"
                 ghost: true
-                onClicked: root.debugBackdrop = !root.debugBackdrop
+                onClicked: {
+                    root.debugBackdrop = !root.debugBackdrop
+                    root.debugBackdropToggled(root.debugBackdrop)
+                }
             }
             AppButton {
                 objectName: "labDebugSourceRectToggle"
                 text: root.debugSourceRect ? "sourceRect：显示" : "sourceRect：隐藏"
                 ghost: true
-                onClicked: root.debugSourceRect = !root.debugSourceRect
+                onClicked: {
+                    root.debugSourceRect = !root.debugSourceRect
+                    root.debugSourceRectToggled(root.debugSourceRect)
+                }
             }
             AppButton {
                 objectName: "labDebugBlurRegionToggle"
                 text: root.debugBlurRegion ? "blur 区域：显示" : "blur 区域：隐藏"
                 ghost: true
-                onClicked: root.debugBlurRegion = !root.debugBlurRegion
+                onClicked: {
+                    root.debugBlurRegion = !root.debugBlurRegion
+                    root.debugBlurRegionToggled(root.debugBlurRegion)
+                }
             }
 
             // Performance info (diagnosis doc §10): FPS + render backend.

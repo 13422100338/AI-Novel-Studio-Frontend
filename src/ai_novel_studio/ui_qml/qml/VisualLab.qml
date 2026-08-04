@@ -126,6 +126,9 @@ ApplicationWindow {
             micaExperiment: root.systemBackdrop
             onClosed: root.experimentOpen = false
             onMicaChanged: root.systemBackdrop = enabled
+            onDebugBackdropToggled: root.debugBackdrop = enabled
+            onDebugSourceRectToggled: root.debugSourceRect = enabled
+            onDebugBlurRegionToggled: root.debugBlurRegion = enabled
         }
 
         // --- Four-column body (mirrors the target workspace structure).
@@ -145,17 +148,15 @@ ApplicationWindow {
                 }
             }
 
-            // 1. Navigation rail (static demo).
-            Item {
+            // 1. Navigation rail (static demo) - Acrylic glass surface so the
+            // quality tiers change it too (diagnosis doc §7.1).
+            AcrylicSurface {
+                objectName: "labNavRail"
                 Layout.preferredWidth: 56
                 Layout.fillHeight: true
-
-                Rectangle {
-                    anchors.fill: parent
-                    color: Theme.tokens.color.bgSurface
-                    border.color: Theme.tokens.color.border
-                    border.width: 1
-                }
+                sourceItem: backgroundLayer
+                radius: 0
+                elevated: false
 
                 ColumnLayout {
                     anchors.fill: parent
@@ -185,17 +186,15 @@ ApplicationWindow {
                 }
             }
 
-            // 2. Context / chapter sidebar (static demo).
-            Item {
+            // 2. Context / chapter sidebar (static demo) - Acrylic glass
+            // surface so the quality tiers change it too (doc §7.1).
+            AcrylicSurface {
+                objectName: "labChapterSidebar"
                 Layout.preferredWidth: 270
                 Layout.fillHeight: true
-
-                Rectangle {
-                    anchors.fill: parent
-                    color: Theme.tokens.color.bgSidebar
-                    border.color: Theme.tokens.color.border
-                    border.width: 1
-                }
+                sourceItem: backgroundLayer
+                radius: 0
+                elevated: false
 
                 ColumnLayout {
                     anchors.fill: parent

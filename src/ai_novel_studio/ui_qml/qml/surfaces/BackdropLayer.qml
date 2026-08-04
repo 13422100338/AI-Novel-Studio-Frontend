@@ -155,6 +155,63 @@ Item {
         opacity: 0.35
     }
 
+    // Recognizable manuscript block behind the AI panel (right side): this is
+    // what makes the tier blur difference visible. Balanced (blur 12) keeps a
+    // soft but legible edge; Premium (blur 56) smears it into a color field.
+    Rectangle {
+        visible: !root.washEnabled
+        x: parent.width * 0.76
+        y: parent.height * 0.24
+        width: parent.width * 0.20
+        height: parent.height * 0.24
+        radius: 14
+        color: Theme.tokens.material.paperFill
+        opacity: 0.82
+        border.color: Theme.tokens.color.border
+        border.width: 1
+
+        Column {
+            anchors.fill: parent
+            anchors.margins: 10
+            spacing: 5
+            Text {
+                width: parent.width
+                text: "第三章 灯塔"
+                font.pixelSize: 10
+                font.bold: true
+                color: root.tint(Theme.tokens.color.textPrimary, 0.6)
+            }
+            Text {
+                width: parent.width
+                text: "雾从海面漫上来，灯塔的光在雾气里变得又厚又软，像一团被揉过的暖色。"
+                font.pixelSize: 9
+                lineHeight: 1.5
+                wrapMode: Text.WordWrap
+                color: root.tint(Theme.tokens.color.textSecondary, 0.65)
+            }
+            Text {
+                width: parent.width
+                text: "他数着灯旋转的间隔，一圈、两圈，直到栈桥尽头的渔火也亮了起来。"
+                font.pixelSize: 9
+                lineHeight: 1.5
+                wrapMode: Text.WordWrap
+                color: root.tint(Theme.tokens.color.textSecondary, 0.65)
+            }
+        }
+    }
+
+    // Warm accent chip behind the AI panel bottom: gives the blur a colored
+    // edge to soften, making Premium visibly different from Balanced.
+    Rectangle {
+        visible: !root.washEnabled
+        x: parent.width * 0.80
+        y: parent.height * 0.72
+        width: parent.width * 0.13
+        height: parent.width * 0.13
+        radius: parent.width * 0.065
+        color: root.tint(Theme.tokens.color.accent, 0.16)
+    }
+
     // Manuscript excerpt card (behind the AI glass column).
     Rectangle {
         visible: !root.washEnabled
