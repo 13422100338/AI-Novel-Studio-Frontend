@@ -13,6 +13,11 @@ def test_default_theme_is_paper() -> None:
     assert tokens["duration"]["panel"] == 220
     assert tokens["duration"]["panelFade"] == 140
     assert tokens["color"]["scrim"] == "#80000000"
+    material = tokens["material"]
+    assert material["glassBlurBalanced"] == "24"
+    assert material["glassBlurPremium"] == "40"
+    assert material["glassTintOpacity"] == "0.62"
+    assert material["acrylicTint"] == "#FBF8F0"
 
 
 def test_set_theme_valid_and_invalid() -> None:
@@ -20,6 +25,7 @@ def test_set_theme_valid_and_invalid() -> None:
     theme.setTheme("dark")
     assert theme.property("themeName") == "dark"
     assert theme.property("tokens")["color"]["bgCanvas"] == "#202124"
+    assert theme.property("tokens")["material"]["acrylicTint"] == "#292A2D"
     theme.setTheme("unknown")
     assert theme.property("themeName") == "paper"
 

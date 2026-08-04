@@ -14,11 +14,13 @@ _QUALITY_NAMES = ("safe", "balanced", "premium")
 
 
 def _material(theme_name: str) -> dict[str, str]:
-    """Simulated-glass tokens per theme (ideal-UI spec 4.2/13).
+    """Glass-material tokens per theme (ideal-UI spec 4.2/13).
 
     ``glassFill`` uses #AARRGGBB so QML can consume it directly; no real-time
-    backdrop blur is used anywhere (the spec forbids expensive blur in the
-    shell until Visual V4 Mica is evaluated).
+    backdrop blur is used in the production shell (the spec forbids expensive
+    blur there until Visual V4 Mica is evaluated). The ``acrylic*`` / ``glass*``
+    tokens below are consumed by the standalone Visual V0 lab page only, where
+    the real-time Acrylic direction is evaluated before any global adoption.
     """
     if theme_name == "paper":
         return {
@@ -28,6 +30,14 @@ def _material(theme_name: str) -> dict[str, str]:
             "glassBorderShadow": "#40D8D0C0",
             "paperFill": "#FFFDF7",
             "noiseOpacity": "0.025",
+            # Real-time acrylic (Visual V0 lab only):
+            "acrylicTint": "#FBF8F0",
+            "acrylicLuminosity": "0.035",
+            "glassBlurBalanced": "24",
+            "glassBlurPremium": "40",
+            "glassTintOpacity": "0.62",
+            "glassSaturation": "0.0",
+            "glassBrightness": "0.0",
         }
     if theme_name == "dark":
         return {
@@ -37,6 +47,13 @@ def _material(theme_name: str) -> dict[str, str]:
             "glassBorderShadow": "#3F000000",
             "paperFill": "#292A2D",
             "noiseOpacity": "0.035",
+            "acrylicTint": "#292A2D",
+            "acrylicLuminosity": "0.05",
+            "glassBlurBalanced": "24",
+            "glassBlurPremium": "40",
+            "glassTintOpacity": "0.62",
+            "glassSaturation": "0.0",
+            "glassBrightness": "0.0",
         }
     return {
         "glassFill": "#CCFFFFFF",
@@ -45,6 +62,13 @@ def _material(theme_name: str) -> dict[str, str]:
         "glassBorderShadow": "#33E4E6E8",
         "paperFill": "#FFFFFF",
         "noiseOpacity": "0.02",
+        "acrylicTint": "#FFFFFF",
+        "acrylicLuminosity": "0.04",
+        "glassBlurBalanced": "24",
+        "glassBlurPremium": "40",
+        "glassTintOpacity": "0.62",
+        "glassSaturation": "-0.1",
+        "glassBrightness": "0.1",
     }
 
 

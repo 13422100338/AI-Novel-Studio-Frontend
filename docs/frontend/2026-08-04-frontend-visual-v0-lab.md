@@ -112,7 +112,8 @@ Safe→不透明降级、reduceMotion→流光静态化、质量档循环与无�
 
 ## 7. 已知边界
 
-- 无实时背景模糊（规范禁止）；Mica 属 Visual V4；
+- 正式 Shell 无实时背景模糊（规范 4.2 禁止），Mica 属 Visual V4；实时
+  Acrylic 仅在独立实验页评估（见 `2026-08-04-frontend-visual-v0-glass-rework.md`）；
 - 流光 border 为 QML 动画实现，非 Shader；V3 再评估 `streaming_border.frag`；
 - `--visual-lab` 进程设置 `QT_QUICK_CONTROLS_STYLE=Basic` 以便 TextField
   `background` 生效，正式入口不改变样式。

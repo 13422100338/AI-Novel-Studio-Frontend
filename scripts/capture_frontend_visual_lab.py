@@ -3,7 +3,9 @@
 Usage (from the worktree root, using its venv):
     .\\.venv\\Scripts\\python.exe scripts\\capture_frontend_visual_lab.py
 
-Saves four combinations: paper/balanced, paper/safe, dark/premium, light/safe.
+The original filenames (visual-lab-*.png) are the pre-rework "before" shots and
+are kept untouched. The rework adds real-time Acrylic surfaces, so this script
+now writes `visual-lab-glass-*.png` "after" shots plus a material-compare crop.
 """
 
 from __future__ import annotations
@@ -66,10 +68,10 @@ def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     combos = (
-        ("paper", "balanced", "visual-lab-paper-balanced.png"),
-        ("paper", "safe", "visual-lab-paper-safe.png"),
-        ("dark", "premium", "visual-lab-dark-premium.png"),
-        ("light", "safe", "visual-lab-light-safe.png"),
+        ("paper", "balanced", "visual-lab-glass-paper-balanced.png"),
+        ("paper", "safe", "visual-lab-glass-paper-safe.png"),
+        ("dark", "premium", "visual-lab-glass-dark-premium.png"),
+        ("light", "safe", "visual-lab-glass-light-safe.png"),
     )
     for theme_name, quality, filename in combos:
         theme.setTheme(theme_name)
@@ -88,7 +90,7 @@ def main() -> int:
         glow.setProperty("state", "success")
     _pump(app, 8)
     image = root.grabWindow()
-    path = OUT_DIR / "visual-lab-paper-glow-success.png"
+    path = OUT_DIR / "visual-lab-glass-paper-glow-success.png"
     assert image.save(str(path)), f"failed to save {path}"
     print(f"saved {path}")
 

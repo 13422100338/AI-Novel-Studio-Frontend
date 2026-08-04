@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from PySide6.QtCore import QMetaObject, QUrl
+from PySide6.QtGui import QColor
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickItem, QQuickWindow
 from pytestqt.qtbot import QtBot
@@ -58,13 +59,33 @@ def _content(window: QQuickWindow) -> QQuickItem:
     return content
 
 
+def _qcolor(value: object) -> QColor:
+    if isinstance(value, QColor):
+        return value
+    return QColor(str(value))
+
+
+def _assert_color_approx(actual: object, expected_hex: str, tolerance: int = 2) -> None:
+    actual_color = _qcolor(actual)
+    expected = QColor(expected_hex)
+    for channel in ("red", "green", "blue", "alpha"):
+        assert (
+            abs(getattr(actual_color, channel)() - getattr(expected, channel)())
+            <= tolerance
+        ), f"{channel} mismatch: {actual_color.name()} vs {expected_hex}"
+
+
 def test_visual_lab_loads_all_demo_surfaces(qtbot: QtBot) -> None:
     _, _, _, window = _load_lab(qtbot)
 
     assert window.objectName() == "visualLabWindow"
     content = _content(window)
     for name in (
-        "labGlassSurface",
+        "labBackgroundLayer",
+        "labAcrylicSurface",
+        "labGlassCompare",
+        "labAcrylicCompare",
+        "labFlatCompare",
         "labPaperSurface",
         "labElevatedSurface",
         "labPrimaryButton",
@@ -100,19 +121,49 @@ def test_visual_lab_theme_switch_updates_window(qtbot: QtBot) -> None:
     assert tokens["color"]["bgCanvas"] == "#202124"
 
 
-def test_visual_quality_degrades_glass_to_opaque(qtbot: QtBot) -> None:
+def test_visual_quality_degrades_acrylic_to_opaque_and_disables_blur(
+    qtbot: QtBot,
+) -> None:
     _, _, theme, window = _load_lab(qtbot)
-    glass = _find_item(_content(window), "labGlassSurface")
-    assert glass is not None
+    acrylic = _find_item(_content(window), "labAcrylicSurface")
+    assert acrylic is not None
 
     assert theme.property("visualQuality") == "balanced"
-    assert glass.property("fillColor") == "#CFFBF8F0"
+    assert acrylic.property("blurEnabled") is True
+    assert acrylic.property("effectActive") is True
+    # Acrylic tint: #FBF8F0 at glassTintOpacity 0.62 -> alpha ~0x9E.
+    _assert_color_approx(acrylic.property("fillColor"), "#9EFBF8F0")
 
     theme.setVisualQuality("safe")
-    qtbot.waitUntil(lambda: glass.property("fillColor") == "#FBF8F0")
+    qtbot.waitUntil(lambda: acrylic.property("blurEnabled") is False)
+    assert acrylic.property("effectActive") is False
+    # Safe tier degrades to a fully opaque surface color.
+    assert _qcolor(acrylic.property("fillColor")).name() == "#fbf8f0"
 
     theme.setVisualQuality("premium")
-    qtbot.waitUntil(lambda: glass.property("fillColor") == "#CFFBF8F0")
+    qtbot.waitUntil(lambda: acrylic.property("blurEnabled") is True)
+    assert acrylic.property("effectActive") is True
+    _assert_color_approx(acrylic.property("fillColor"), "#9EFBF8F0")
+
+
+def test_acrylic_captures_background_layer(qtbot: QtBot) -> None:
+    _, _, _, window = _load_lab(qtbot)
+    content = _content(window)
+    acrylic = _find_item(content, "labAcrylicSurface")
+    background = _find_item(content, "labBackgroundLayer")
+    assert acrylic is not None and background is not None
+
+    source = acrylic.property("sourceItem")
+    assert source is not None
+    assert source.objectName() == "labBackgroundLayer"
+
+    # The capture rectangle follows the panel geometry inside the layer.
+    rect = acrylic.property("captureRect")
+    assert rect is not None
+    assert rect.width() > 100
+    assert rect.height() > 100
+    assert abs(rect.width() - float(acrylic.property("width"))) < 1
+    assert abs(rect.height() - float(acrylic.property("height"))) < 1
 
 
 def test_streaming_glow_degrades_with_reduce_motion(qtbot: QtBot) -> None:

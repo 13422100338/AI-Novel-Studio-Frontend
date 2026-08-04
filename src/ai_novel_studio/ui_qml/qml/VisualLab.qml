@@ -26,6 +26,11 @@ ApplicationWindow {
     color: Theme.tokens.color.bgCanvas
     font.family: Theme.tokens.font.ui
 
+    // Helper: theme color with a low alpha (background decorations only).
+    function tint(color, alpha) {
+        return Qt.rgba(color.r, color.g, color.b, alpha)
+    }
+
     // Staggered entrance for the three columns (occasional page, 50ms steps,
     // opacity only, respects reduceMotion).
     property int revealStep: 0
@@ -37,6 +42,164 @@ ApplicationWindow {
             root.revealStep += 1
             if (root.revealStep >= 3) {
                 stop()
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Complex backdrop (glass rework): NNGroup notes real glass only reads
+    // when it sits over a busy, meaningful background. This layer holds the
+    // base gradient plus literary-themed decorative content that the acrylic
+    // panels above blur. It is a lab-only experiment surface; the production
+    // shell is untouched.
+    // ---------------------------------------------------------------------
+    Item {
+        id: backgroundLayer
+        objectName: "labBackgroundLayer"
+        anchors.fill: parent
+
+        Rectangle {
+            anchors.fill: parent
+            gradient: Gradient {
+                GradientStop {
+                    position: 0.0
+                    color: root.tint(Theme.tokens.color.bgCanvas, 1)
+                }
+                GradientStop {
+                    position: 0.6
+                    color: Qt.lighter(Theme.tokens.color.bgCanvas, 1.04)
+                }
+                GradientStop {
+                    position: 1.0
+                    color: root.tint(Theme.tokens.color.bgCanvas, 1)
+                }
+            }
+        }
+
+        // Notebook hairlines give the blur something fine to smear.
+        Repeater {
+            model: 4
+            Rectangle {
+                x: parent.width * (0.16 + index * 0.22)
+                y: parent.height * 0.10
+                width: 1
+                height: parent.height * 0.76
+                color: Theme.tokens.color.border
+                opacity: 0.30
+            }
+        }
+
+        // Soft color fields (low saturation, calm; spec 4.1 "avoid RGB").
+        Rectangle {
+            x: parent.width * 0.03
+            y: parent.height * 0.16
+            width: parent.width * 0.24
+            height: parent.height * 0.30
+            radius: 20
+            color: root.tint(Theme.tokens.color.accent, 0.07)
+        }
+        Rectangle {
+            x: parent.width * 0.70
+            y: parent.height * 0.18
+            width: parent.width * 0.24
+            height: parent.height * 0.26
+            radius: 24
+            color: root.tint(Theme.tokens.color.accent, 0.06)
+        }
+        Rectangle {
+            x: parent.width * 0.60
+            y: parent.height * 0.54
+            width: parent.width * 0.32
+            height: parent.height * 0.20
+            radius: 18
+            color: root.tint(Theme.tokens.color.accent, 0.05)
+        }
+        Rectangle {
+            x: parent.width * 0.38
+            y: parent.height * 0.22
+            width: parent.width * 0.12
+            height: parent.width * 0.12
+            radius: parent.width * 0.06
+            color: root.tint(Theme.tokens.agent.thinkingA, 0.05)
+        }
+
+        // Manuscript excerpt card (behind the AI glass column).
+        Rectangle {
+            x: parent.width * 0.035
+            y: parent.height * 0.52
+            width: parent.width * 0.26
+            height: parent.height * 0.26
+            radius: 14
+            color: Theme.tokens.material.paperFill
+            opacity: 0.85
+            border.color: Theme.tokens.color.border
+            border.width: 1
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: 12
+                spacing: 6
+                Text {
+                    width: parent.width
+                    text: "第六章 渡口"
+                    font.pixelSize: 11
+                    font.bold: true
+                    color: root.tint(Theme.tokens.color.textPrimary, 0.55)
+                }
+                Text {
+                    width: parent.width
+                    text: "渡轮靠岸时，甲板上的水汽把远处灯塔的光晕揉成一团模糊的暖色。"
+                    font.pixelSize: 10
+                    lineHeight: 1.6
+                    wrapMode: Text.WordWrap
+                    color: root.tint(Theme.tokens.color.textSecondary, 0.6)
+                }
+                Text {
+                    width: parent.width
+                    text: "林默把最后一封信塞进外套内袋，沿着湿漉漉的栈桥走进镇子。"
+                    font.pixelSize: 10
+                    lineHeight: 1.6
+                    wrapMode: Text.WordWrap
+                    color: root.tint(Theme.tokens.color.textSecondary, 0.6)
+                }
+            }
+        }
+
+        // Outline card (behind the Agent card column).
+        Rectangle {
+            x: parent.width * 0.69
+            y: parent.height * 0.72
+            width: parent.width * 0.27
+            height: parent.height * 0.22
+            radius: 14
+            color: Theme.tokens.color.bgSurface
+            opacity: 0.9
+            border.color: Theme.tokens.color.border
+            border.width: 1
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: 12
+                spacing: 5
+                Text {
+                    width: parent.width
+                    text: "大纲 · 第二卷"
+                    font.pixelSize: 11
+                    font.bold: true
+                    color: root.tint(Theme.tokens.color.textPrimary, 0.55)
+                }
+                Text {
+                    width: parent.width
+                    text: "· 人物：林默（退役水手）"
+                    font.pixelSize: 10
+                    color: root.tint(Theme.tokens.color.textSecondary, 0.6)
+                }
+                Text {
+                    width: parent.width
+                    text: "· 地点：雾港 · 老渡口"
+                    font.pixelSize: 10
+                    color: root.tint(Theme.tokens.color.textSecondary, 0.6)
+                }
             }
         }
     }
@@ -57,7 +220,7 @@ ApplicationWindow {
                 color: Theme.tokens.color.textPrimary
             }
             Text {
-                text: "暖色纸张 + 冷色智能玻璃 · 所有表面均不实时模糊"
+                text: "暖色纸张 + 冷色智能玻璃 · 实时 Acrylic 仅在本实验页评估（正式界面未改动）"
                 font.pixelSize: 11
                 color: Theme.tokens.color.textSecondary
             }
@@ -129,10 +292,11 @@ ApplicationWindow {
                     }
                 }
 
-                GlassSurface {
+                AcrylicSurface {
                     id: agentGlass
-                    objectName: "labGlassSurface"
+                    objectName: "labAcrylicSurface"
                     anchors.fill: parent
+                    sourceItem: backgroundLayer
 
                     ColumnLayout {
                         anchors.fill: parent
@@ -366,7 +530,7 @@ ApplicationWindow {
                     ElevatedSurface {
                         objectName: "labElevatedSurface"
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 148
+                        Layout.preferredHeight: 172
 
                         ColumnLayout {
                             anchors.fill: parent
@@ -406,25 +570,27 @@ ApplicationWindow {
                                 }
                             }
                             Text {
-                                text: "Safe 档降级为不透明表面；Balanced/Premium 使用玻璃与噪声。"
+                                text: "Safe 档降级为不透明表面；Balanced/Premium 启用实时 Acrylic 背景模糊（仅实验页）。"
                                 font.pixelSize: 10
                                 wrapMode: Text.WordWrap
                                 color: Theme.tokens.color.textSecondary
                             }
 
-                            // 材质层次对比：同一区域玻璃 vs 实色（规范 4.2）。
+                            // 材质层次对比：模拟玻璃 vs 实时 Acrylic vs 实色（规范 4.2）。
                             RowLayout {
                                 Layout.fillWidth: true
-                                spacing: 10
+                                Layout.preferredHeight: 60
+                                spacing: 8
 
                                 GlassSurface {
-                                    Layout.preferredWidth: 160
+                                    objectName: "labGlassCompare"
+                                    Layout.preferredWidth: 150
                                     Layout.fillHeight: true
                                     ColumnLayout {
                                         anchors.fill: parent
                                         anchors.margins: 10
                                         Text {
-                                            text: "玻璃"
+                                            text: "玻璃（模拟）"
                                             font.pixelSize: 10
                                             font.bold: true
                                             color: Theme.tokens.color.textPrimary
@@ -438,8 +604,32 @@ ApplicationWindow {
                                         }
                                     }
                                 }
+                                AcrylicSurface {
+                                    objectName: "labAcrylicCompare"
+                                    Layout.preferredWidth: 150
+                                    Layout.fillHeight: true
+                                    sourceItem: backgroundLayer
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 10
+                                        Text {
+                                            text: "Acrylic（实时）"
+                                            font.pixelSize: 10
+                                            font.bold: true
+                                            color: Theme.tokens.color.textPrimary
+                                        }
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: "背景模糊 · 实验评估"
+                                            font.pixelSize: 9
+                                            wrapMode: Text.WordWrap
+                                            color: Theme.tokens.color.textSecondary
+                                        }
+                                    }
+                                }
                                 FlatSurface {
-                                    Layout.preferredWidth: 160
+                                    objectName: "labFlatCompare"
+                                    Layout.preferredWidth: 150
                                     Layout.fillHeight: true
                                     ColumnLayout {
                                         anchors.fill: parent
@@ -542,7 +732,7 @@ ApplicationWindow {
 
         Text {
             Layout.fillWidth: true
-            text: "说明：本页为独立样板（--visual-lab），不替换正式界面。质量档 Safe/Balanced/Premium 与 reduceMotion 均会实时生效。"
+            text: "说明：本页为独立样板（--visual-lab），不替换正式界面。质量档 Safe 关闭实时模糊（实色表面），Balanced/Premium 启用实时 Acrylic 背景模糊，均仅在本实验页生效；reduceMotion 实时生效。"
             font.pixelSize: 10
             color: Theme.tokens.color.textSecondary
         }
