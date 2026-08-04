@@ -10,6 +10,72 @@ from __future__ import annotations
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
 _THEME_NAMES = ("paper", "light", "dark")
+_QUALITY_NAMES = ("safe", "balanced", "premium")
+
+
+def _material(theme_name: str) -> dict[str, str]:
+    """Simulated-glass tokens per theme (ideal-UI spec 4.2/13).
+
+    ``glassFill`` uses #AARRGGBB so QML can consume it directly; no real-time
+    backdrop blur is used anywhere (the spec forbids expensive blur in the
+    shell until Visual V4 Mica is evaluated).
+    """
+    if theme_name == "paper":
+        return {
+            "glassFill": "#CFFBF8F0",
+            "glassFillStrong": "#EBFBF8F0",
+            "glassBorderHighlight": "#66FFFFFF",
+            "glassBorderShadow": "#40D8D0C0",
+            "paperFill": "#FFFDF7",
+            "noiseOpacity": "0.025",
+        }
+    if theme_name == "dark":
+        return {
+            "glassFill": "#CC292A2D",
+            "glassFillStrong": "#E8292A2D",
+            "glassBorderHighlight": "#2EFFFFFF",
+            "glassBorderShadow": "#3F000000",
+            "paperFill": "#292A2D",
+            "noiseOpacity": "0.035",
+        }
+    return {
+        "glassFill": "#CCFFFFFF",
+        "glassFillStrong": "#EFFFFFFF",
+        "glassBorderHighlight": "#66FFFFFF",
+        "glassBorderShadow": "#33E4E6E8",
+        "paperFill": "#FFFFFF",
+        "noiseOpacity": "0.02",
+    }
+
+
+def _elevation() -> dict[str, str]:
+    return {
+        "shadowSoft": "#22000000",
+        "shadowStrong": "#40000000",
+    }
+
+
+def _motion() -> dict[str, int]:
+    return {
+        "micro": 100,
+        "normal": 160,
+        "panelFade": 140,
+        "glowCycle": 2800,
+    }
+
+
+def _agent_colors() -> dict[str, str]:
+    """AI state colors (ideal-UI spec 5.2); shared across themes."""
+    return {
+        "thinkingA": "#7C6FD8",
+        "thinkingB": "#9B8FE8",
+        "generatingA": "#7C6FD8",
+        "generatingB": "#D9A85B",
+        "success": "#3E7C4F",
+        "error": "#A6453F",
+        "waiting": "#B7791F",
+        "cancelled": "#9A958C",
+    }
 
 
 def _palette(theme_name: str) -> dict[str, object]:
@@ -66,6 +132,10 @@ def _palette(theme_name: str) -> dict[str, object]:
         }
     return {
         "color": colors,
+        "material": _material(theme_name),
+        "elevation": _elevation(),
+        "motion": _motion(),
+        "agent": _agent_colors(),
         "spacing": {
             "xs": 4,
             "sm": 8,
@@ -94,14 +164,20 @@ def _normalize_theme_name(value: str) -> str:
     return value if value in _THEME_NAMES else "paper"
 
 
+def _normalize_quality_name(value: str) -> str:
+    return value if value in _QUALITY_NAMES else "balanced"
+
+
 class ThemeProvider(QObject):
     """Exposes the current token map to QML as the ``Theme`` singleton."""
 
     tokens_changed = Signal()
+    quality_changed = Signal()
 
     def __init__(self, theme_name: str = "paper", parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._theme_name = _normalize_theme_name(theme_name)
+        self._visual_quality = "balanced"
         self._tokens = _palette(self._theme_name)
 
     @Property(str, notify=tokens_changed)
@@ -125,3 +201,20 @@ class ThemeProvider(QObject):
     def nextThemeName(self) -> str:
         index = _THEME_NAMES.index(self._theme_name)
         return _THEME_NAMES[(index + 1) % len(_THEME_NAMES)]
+
+    @Property(str, notify=quality_changed)
+    def visualQuality(self) -> str:
+        return self._visual_quality
+
+    @Slot(str)
+    def setVisualQuality(self, quality: str) -> None:
+        name = _normalize_quality_name(quality)
+        if name == self._visual_quality:
+            return
+        self._visual_quality = name
+        self.quality_changed.emit()
+
+    @Slot(result=str)
+    def nextVisualQuality(self) -> str:
+        index = _QUALITY_NAMES.index(self._visual_quality)
+        return _QUALITY_NAMES[(index + 1) % len(_QUALITY_NAMES)]

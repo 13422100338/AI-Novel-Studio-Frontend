@@ -55,6 +55,11 @@ def app_qml_path() -> Path:
     return Path(__file__).resolve().parent / "qml" / "App.qml"
 
 
+def visual_lab_qml_path() -> Path:
+    """Standalone Visual V0 sample page (ideal-UI spec 15, stage V0)."""
+    return Path(__file__).resolve().parent / "qml" / "VisualLab.qml"
+
+
 def create_engine() -> QQmlApplicationEngine:
     """Build the TextArea-mode shell (tests and screenshot baseline)."""
     engine = QQmlApplicationEngine()
@@ -71,7 +76,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = list(argv) if argv is not None else sys.argv
     use_webengine = "--textarea" not in args
     args = [arg for arg in args if arg != "--textarea"]
-    if use_webengine:
+    visual_lab = "--visual-lab" in args
+    args = [arg for arg in args if arg != "--visual-lab"]
+    if use_webengine and not visual_lab:
         # QtWebEngine's GPU compositor on Windows can lose its D3D context
         # during layout-driven resizes (AI dock open/close), leaving a black
         # strip in the newly exposed editor area until the renderer recovers.
@@ -90,6 +97,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     engine = QQmlApplicationEngine()
     engine.addImportPath(str(Path(__file__).resolve().parent / "qml"))
     facade, theme = register_frontend_types(engine)
+    if visual_lab:
+        # Basic style so custom `background` items on TextField (VisualLab and
+        # FormCard) actually apply instead of being ignored by the native style.
+        os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
+        # Visual V0 sample page: no WebEngine, no editor bridge. It is a
+        # standalone experiment surface, not the production shell.
+        _FRONTEND_STATE[id(engine)] = (facade, theme)
+        engine.load(QUrl.fromLocalFile(str(visual_lab_qml_path())))
+        if not engine.rootObjects():
+            return 1
+        return app.exec()
     engine.rootContext().setContextProperty("WritingPageUseWebEngine", use_webengine)
     if use_webengine:
         from ai_novel_studio.ui_qml.bridge.editor_bridge import EditorBridge
