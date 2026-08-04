@@ -38,6 +38,9 @@ Rectangle {
             text: "已引用 · " + root.label
             font.pixelSize: 11
             elide: Text.ElideRight
+            // Force a single line: elide only applies on one line, and a
+            // multi-line chapter label would otherwise overflow the chip.
+            maximumLineCount: 1
             color: Theme.tokens.color.textPrimary
         }
         Text {
@@ -46,6 +49,7 @@ Rectangle {
             text: root.preview
             font.pixelSize: 10
             elide: Text.ElideRight
+            maximumLineCount: 1
             color: Theme.tokens.color.textSecondary
             // Responsive cap: the preview must never squeeze the chapter
             // label out of view in a narrow panel.

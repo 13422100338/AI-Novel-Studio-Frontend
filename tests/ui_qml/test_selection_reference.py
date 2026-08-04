@@ -1,5 +1,7 @@
 """Frontend Wave C1.1: selection reference protocol (bridge + facade)."""
 
+import json
+
 from ai_novel_studio.ui_qml.bridge.editor_bridge import EditorBridge
 from ai_novel_studio.ui_qml.bridge.hash_utils import fnv1a_hash, sha256
 from ai_novel_studio.ui_qml.bridge.mock_novel_studio_facade import MockNovelStudioFacade
@@ -125,6 +127,36 @@ def test_facade_selection_reference_lifecycle() -> None:
     facade.setSelectionReferenceJson(_valid_payload())
     facade.selectChapter(1)
     assert facade.property("hasSelectionReference") is False
+
+
+def test_facade_preview_is_single_line_with_ellipsis_for_long_text() -> None:
+    """Long or cross-paragraph selections must not overflow the reference chip.
+
+    The preview collapses newlines to one line and truncates with an ellipsis;
+    QML elide only applies on a single line.
+    """
+    facade = MockNovelStudioFacade()
+    long_text = "first paragraph, long enough." * 20 + "\n\nsecond paragraph." + "x" * 60
+
+    facade.setSelectionReferenceJson(
+        json.dumps(
+            {
+                "chapterId": "chapter-1",
+                "baseRevision": 3,
+                "from": 10,
+                "to": 16,
+                "selectedText": long_text,
+                "selectedTextHash": fnv1a_hash(long_text),
+            }
+        )
+    )
+
+    preview = facade.property("selectionReferencePreview")
+    assert isinstance(preview, str)
+    assert "\n" not in preview
+    assert " " in preview, "newlines should collapse to a space"
+    assert preview.endswith("…")
+    assert len(preview) <= 81
 
 
 def test_facade_rejects_stale_chapter_and_revision() -> None:

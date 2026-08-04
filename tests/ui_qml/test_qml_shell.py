@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -257,6 +258,51 @@ def test_selection_chip_lays_out_label_preview_and_close_side_by_side(
         right = texts[index + 1][0]
         assert left.x() + left.width() <= right.x() + 1, (
             f"{texts[index][1][:12]} overlaps {texts[index + 1][1][:12]}"
+        )
+
+
+def test_selection_chip_long_preview_stays_inside_chip(qtbot: QtBot) -> None:
+    """A very long (cross-paragraph) quote preview must never overflow."""
+    engine, facade, _ = _load_engine(qtbot)
+    window = engine.rootObjects()[0]
+    facade.toggleAiDrawer(True)
+
+    long_text = "very long quoted text that must elide inside the chip. " * 12
+    long_text = long_text + "\n\nsecond paragraph quote."
+    facade.setSelectionReferenceJson(
+        json.dumps(
+            {
+                "chapterId": "chapter-1",
+                "baseRevision": 3,
+                "from": 0,
+                "to": 6,
+                "selectedText": long_text,
+                "selectedTextHash": fnv1a_hash(long_text),
+            }
+        )
+    )
+
+    qtbot.waitUntil(
+        lambda: _find_visible_quick_item(
+            window.contentItem(), "selectionReferenceChip"
+        )
+        is not None,
+        timeout=5000,
+    )
+    qtbot.wait(300)
+    chip = _find_visible_quick_item(window.contentItem(), "selectionReferenceChip")
+    assert chip is not None
+    chip_right = chip.x() + chip.width()
+
+    texts = []
+    for child in chip.childItems():
+        for leaf in child.childItems():
+            value = leaf.property("text")
+            if isinstance(value, str) and value:
+                texts.append(leaf)
+    for leaf in texts:
+        assert leaf.x() + leaf.width() <= chip_right + 1, (
+            f"text overflows chip right edge: {str(leaf.property('text'))[:12]}"
         )
 
 

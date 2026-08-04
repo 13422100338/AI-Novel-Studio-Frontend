@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { splitBlock } from "@tiptap/pm/commands";
+import { TextSelection, Transaction } from "@tiptap/pm/state";
 import {
   buildSelectionReference,
   DebouncedSaveController,
@@ -14,6 +16,39 @@ import {
   typeText,
   undoState,
 } from "../src/editor-core";
+
+describe("enter / shift-enter editing commands", () => {
+  it("splitBlock splits the paragraph at the cursor (Enter)", () => {
+    const state = createNovelState("第一段内容");
+    const end = state.doc.content.size - 1;
+    const withCursor = state.apply(
+      state.tr.setSelection(TextSelection.create(state.doc, end, end)),
+    );
+    let transaction: Transaction | null = null;
+
+    const handled = splitBlock(withCursor, (tr) => {
+      transaction = tr;
+    });
+
+    expect(handled).toBe(true);
+    expect(transaction).not.toBeNull();
+    const after = withCursor.apply(transaction!);
+    expect(docText(after.doc)).toContain("第一段内容\n");
+  });
+
+  it("hard_break node exists in the schema (Shift+Enter target)", () => {
+    const state = createNovelState("行一\n行二");
+    let found = false;
+    state.doc.descendants((node) => {
+      if (node.type.name === "hard_break") {
+        found = true;
+      }
+      return true;
+    });
+    expect(found).toBe(true);
+    expect(stateToMarkdown(state)).toContain("行一\n行二");
+  });
+});
 
 describe("editing core", () => {
   it("parses and serializes without content loss", () => {

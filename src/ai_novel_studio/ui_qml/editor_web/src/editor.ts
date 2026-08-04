@@ -13,6 +13,7 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { EditorView } from "@tiptap/pm/view";
 import { keymap } from "@tiptap/pm/keymap";
 import { history, redo, undo } from "@tiptap/pm/history";
+import { baseKeymap } from "@tiptap/pm/commands";
 import {
   DebouncedSaveController,
   SnapshotPayload,
@@ -89,6 +90,7 @@ function createEditorState(markdown: string): EditorState {
       history(),
       decoratePlugin(),
       keymap({
+        ...baseKeymap,
         "Mod-z": () => {
           const view = thisRef.view;
           return view ? undo(view.state, view.dispatch) : false;

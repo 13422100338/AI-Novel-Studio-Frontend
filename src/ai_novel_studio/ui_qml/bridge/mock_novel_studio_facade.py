@@ -1053,7 +1053,11 @@ class MockNovelStudioFacade(QObject):
     def selectionReferencePreview(self) -> str:
         if self._selection_reference is None:
             return ""
-        preview = self._selection_reference.selected_text.strip()
+        # Collapse whitespace/newlines to a single space: a cross-paragraph
+        # selection would otherwise render as multiple lines inside the chip
+        # and overflow its fixed height (the QML elide only applies on one
+        # line). The quote shown is a preview, not the authoritative text.
+        preview = " ".join(self._selection_reference.selected_text.split())
         return preview[:80] + ("…" if len(preview) > 80 else "")
 
     @Slot(str)
