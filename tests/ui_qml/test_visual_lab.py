@@ -83,8 +83,10 @@ def test_visual_lab_loads_all_demo_surfaces(qtbot: QtBot) -> None:
     for name in (
         "labBackgroundLayer",
         "labAcrylicSurface",
+        "labGlassSurface",
         "labGlassCompare",
         "labAcrylicCompare",
+        "labMicaCompare",
         "labFlatCompare",
         "labPaperSurface",
         "labElevatedSurface",
@@ -164,6 +166,34 @@ def test_acrylic_captures_background_layer(qtbot: QtBot) -> None:
     assert rect.height() > 100
     assert abs(rect.width() - float(acrylic.property("width"))) < 1
     assert abs(rect.height() - float(acrylic.property("height"))) < 1
+
+
+def test_system_backdrop_mode_switches_to_opaque_glass(qtbot: QtBot) -> None:
+    _, _, _, window = _load_lab(qtbot)
+    content = _content(window)
+    acrylic = _find_item(content, "labAcrylicSurface")
+    glass = _find_item(content, "labGlassSurface")
+    mica_compare = _find_item(content, "labMicaCompare")
+    assert acrylic is not None and glass is not None and mica_compare is not None
+
+    # Default (no system backdrop): real-time Acrylic visible, glass hidden.
+    assert acrylic.property("visible") is True
+    assert glass.property("visible") is False
+
+    window.setProperty("systemBackdrop", True)
+    qtbot.waitUntil(lambda: glass.property("visible") is True)
+    assert acrylic.property("visible") is False
+    assert glass.property("opaque") is True
+    assert mica_compare.property("visible") is True
+
+    # Backdrop mode makes the window transparent so DWM draws behind it.
+    color = window.property("color")
+    assert color.alpha() == 0
+
+    window.setProperty("systemBackdrop", False)
+    qtbot.waitUntil(lambda: acrylic.property("visible") is True)
+    assert glass.property("visible") is False
+    assert window.property("color").alpha() == 255
 
 
 def test_streaming_glow_degrades_with_reduce_motion(qtbot: QtBot) -> None:

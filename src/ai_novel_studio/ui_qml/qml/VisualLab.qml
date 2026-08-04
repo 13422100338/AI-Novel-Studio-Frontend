@@ -23,7 +23,11 @@ ApplicationWindow {
     minimumHeight: 700
     visible: true
     title: "AI Novel Studio · Visual V0 样板"
-    color: Theme.tokens.color.bgCanvas
+    // Set by the launcher (bootstrap.py) when the Windows 11 DWM system
+    // backdrop (Mica) was applied: the window turns transparent so the
+    // wallpaper blur behind the window shows through the lab backdrop.
+    property bool systemBackdrop: false
+    color: root.systemBackdrop ? "transparent" : Theme.tokens.color.bgCanvas
     font.family: Theme.tokens.font.ui
 
     // Helper: theme color with a low alpha (background decorations only).
@@ -62,8 +66,41 @@ ApplicationWindow {
         objectName: "labBackgroundLayer"
         anchors.fill: parent
 
+        // Mica helper layer: semi-transparent themed wash over the DWM
+        // wallpaper blur so text stays readable (approximates Mica's own
+        // tint + noise). Active only when the system backdrop succeeded.
+        Item {
+            anchors.fill: parent
+            visible: root.systemBackdrop
+
+            Rectangle {
+                anchors.fill: parent
+                gradient: Gradient {
+                    GradientStop {
+                        position: 0.0
+                        color: root.tint(Theme.tokens.color.bgCanvas, 0.84)
+                    }
+                    GradientStop {
+                        position: 0.55
+                        color: root.tint(Theme.tokens.color.bgCanvas, 0.74)
+                    }
+                    GradientStop {
+                        position: 1.0
+                        color: root.tint(Theme.tokens.color.bgCanvas, 0.78)
+                    }
+                }
+            }
+            NoiseOverlay {
+                anchors.fill: parent
+            }
+        }
+
+        // --- Decorative content: only when the lab draws its own backdrop.
+        // In Mica mode the real background is the wallpaper blur, so these
+        // in-app decorations are hidden to keep the material honest.
         Rectangle {
             anchors.fill: parent
+            visible: !root.systemBackdrop
             gradient: Gradient {
                 GradientStop {
                     position: 0.0
@@ -83,6 +120,7 @@ ApplicationWindow {
         // Notebook hairlines give the blur something fine to smear.
         Repeater {
             model: 4
+            visible: !root.systemBackdrop
             Rectangle {
                 x: parent.width * (0.16 + index * 0.22)
                 y: parent.height * 0.10
@@ -95,6 +133,7 @@ ApplicationWindow {
 
         // Soft color fields (low saturation, calm; spec 4.1 "avoid RGB").
         Rectangle {
+            visible: !root.systemBackdrop
             x: parent.width * 0.03
             y: parent.height * 0.16
             width: parent.width * 0.24
@@ -103,6 +142,7 @@ ApplicationWindow {
             color: root.tint(Theme.tokens.color.accent, 0.07)
         }
         Rectangle {
+            visible: !root.systemBackdrop
             x: parent.width * 0.70
             y: parent.height * 0.18
             width: parent.width * 0.24
@@ -111,6 +151,7 @@ ApplicationWindow {
             color: root.tint(Theme.tokens.color.accent, 0.06)
         }
         Rectangle {
+            visible: !root.systemBackdrop
             x: parent.width * 0.60
             y: parent.height * 0.54
             width: parent.width * 0.32
@@ -119,6 +160,7 @@ ApplicationWindow {
             color: root.tint(Theme.tokens.color.accent, 0.05)
         }
         Rectangle {
+            visible: !root.systemBackdrop
             x: parent.width * 0.38
             y: parent.height * 0.22
             width: parent.width * 0.12
@@ -129,6 +171,7 @@ ApplicationWindow {
 
         // Manuscript excerpt card (behind the AI glass column).
         Rectangle {
+            visible: !root.systemBackdrop
             x: parent.width * 0.035
             y: parent.height * 0.52
             width: parent.width * 0.26
@@ -171,6 +214,7 @@ ApplicationWindow {
 
         // Outline card (behind the Agent card column).
         Rectangle {
+            visible: !root.systemBackdrop
             x: parent.width * 0.69
             y: parent.height * 0.72
             width: parent.width * 0.27
@@ -224,7 +268,7 @@ ApplicationWindow {
                 color: Theme.tokens.color.textPrimary
             }
             Text {
-                text: "暖色纸张 + 冷色智能玻璃 · 实时 Acrylic 仅在本实验页评估（正式界面未改动）"
+                text: "暖色纸张 + 冷色智能玻璃 · 系统背板（壁纸透出）与实时 Acrylic 仅在本实验页评估（正式界面未改动）"
                 font.pixelSize: 11
                 color: Theme.tokens.color.textSecondary
             }
@@ -296,11 +340,29 @@ ApplicationWindow {
                     }
                 }
 
-                AcrylicSurface {
-                    id: agentGlass
-                    objectName: "labAcrylicSurface"
+                // AI pane: two material modes sharing one content column.
+                // - Default: real-time Acrylic capturing the in-app backdrop
+                //   layer (experimental comparison).
+                // - systemBackdrop (Mica): opaque glass that never lets the
+                //   wallpaper through, keeping the glass decorations only.
+                Item {
                     anchors.fill: parent
-                    sourceItem: backgroundLayer
+
+                    AcrylicSurface {
+                        id: agentAcrylic
+                        objectName: "labAcrylicSurface"
+                        anchors.fill: parent
+                        sourceItem: backgroundLayer
+                        visible: !root.systemBackdrop
+                    }
+
+                    GlassSurface {
+                        id: agentGlass
+                        objectName: "labGlassSurface"
+                        anchors.fill: parent
+                        opaque: true
+                        visible: root.systemBackdrop
+                    }
 
                     ColumnLayout {
                         anchors.fill: parent
@@ -610,6 +672,7 @@ ApplicationWindow {
                                 }
                                 AcrylicSurface {
                                     objectName: "labAcrylicCompare"
+                                    visible: !root.systemBackdrop
                                     Layout.preferredWidth: 150
                                     Layout.fillHeight: true
                                     sourceItem: backgroundLayer
@@ -625,6 +688,35 @@ ApplicationWindow {
                                         Text {
                                             Layout.fillWidth: true
                                             text: "背景模糊 · 实验评估"
+                                            font.pixelSize: 9
+                                            wrapMode: Text.WordWrap
+                                            color: Theme.tokens.color.textSecondary
+                                        }
+                                    }
+                                }
+                                // Mica mode: the wallpaper shows through the
+                                // window backdrop only; panels stay opaque.
+                                Rectangle {
+                                    objectName: "labMicaCompare"
+                                    visible: root.systemBackdrop
+                                    Layout.preferredWidth: 150
+                                    Layout.fillHeight: true
+                                    radius: Theme.tokens.radius.r12
+                                    color: "transparent"
+                                    border.color: Theme.tokens.color.border
+                                    border.width: 1
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 10
+                                        Text {
+                                            text: "Mica 底板"
+                                            font.pixelSize: 10
+                                            font.bold: true
+                                            color: Theme.tokens.color.textPrimary
+                                        }
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: "壁纸透出 · 面板不透"
                                             font.pixelSize: 9
                                             wrapMode: Text.WordWrap
                                             color: Theme.tokens.color.textSecondary

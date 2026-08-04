@@ -83,20 +83,51 @@
 - **improve-animations / review-animations**：本 diff 未新增/修改任何动画，
   既有动效（stagger/fade/glow 2.8s）维持原评审结论（Approve）。
 
+## 3.1 系统背板模式（Mica：底板透壁纸，面板不透）
+
+用户方向：底板可以微微透出窗口后面的桌面壁纸，但各个面板只保留玻璃质感、
+**不**透出壁纸。已按此在实验页落地：
+
+- 新增 `bridge/windows_backdrop.py`：`DwmSetWindowAttribute(38, DWMSBT_MAINWINDOW=2)`
+  请求 DWM 在整窗后面绘制 Mica（壁纸模糊采样）；仅 Windows 11 22621+ 生效，
+  任何失败静默返回 False（规范 12：系统材质必须可回退，不影响正常渲染）；
+- `bootstrap.py --visual-lab` 启动时应用 Mica 并把结果写入
+  `systemBackdrop` 属性；QML 据此分支：
+  - **Mica 模式**：窗口底色透明（`color: "transparent"`），底板绘制
+    半透明主题色辅助层（近似 Mica 自身的着色 + 噪声，保证文字可读），
+    隐藏应用内装饰背景；AI 面板切换为 `GlassSurface.opaque`
+    （实色底 + 顶部内高光 + 细边 + 噪声——有玻璃质感但绝不透壁纸）；
+    材质对比行显示「玻璃（模拟） / Mica 底板 / 实色」；
+  - **无系统背板**（Win10 / offscreen / 调用失败）：完全保持原有路径
+    （复杂背景 + 实时 Acrylic 面板），行为与上轮一致；
+- `GlassSurface.qml` 新增 `opaque` 属性（默认 false，正式 Shell 不用）；
+- 截图脚本新增 `--windowed` 参数，用于真机捕获 Mica 效果；默认 offscreen
+  模式不受影响。
+
 ## 4. 验证
 
 ```text
-pytest（独立前端）    149 passed, 35 skipped
-pytest（c9a2 集成）   225 passed
+pytest（独立前端）    153 passed, 35 skipped
+pytest（c9a2 集成）   229 passed
 ruff                 通过
-mypy                 通过（41 files）
+mypy                 通过（42 files）
 ```
 
 - 新增测试：Safe 档关闭 blur/实色降级、Balanced/Premium 开启 blur、
-  `captureRect` 跟随面板几何、`sourceItem` 指向背景层、新 token 断言；
+  `captureRect` 跟随面板几何、`sourceItem` 指向背景层、新 token 断言、
+  `systemBackdrop` 切换（透明窗口 + 不透壁纸玻璃面板 + Mica 对比件）、
+  DWM 常量与失败安全（非支持环境一律返回 False、永不抛异常）；
 - 像素验证：Safe 前后截图在面板区域完全一致（无回归）；Balanced 空白区
   sd 36.9 → 24.2（细节被模糊抹平）且整体变暗（tint 0.62 叠加），证明实时
   背景模糊生效。
+
+真机 Mica 验证（需要 Windows 11 22H2+，且能直接看到壁纸透出）：
+
+```powershell
+.\.venv\Scripts\python.exe -m ai_novel_studio.ui_qml --visual-lab
+# 或真机截图：
+.\.venv\Scripts\python.exe scripts\capture_frontend_visual_lab.py --windowed
+```
 
 截图（`docs/frontend/screenshots/`，旧图为 before，`*-glass-*` 为 after）：
 

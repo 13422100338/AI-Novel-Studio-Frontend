@@ -12,6 +12,11 @@ Item {
 
     property real radius: Theme.tokens.radius.r12
     property bool elevated: true
+    // Opaque glass mode (Visual V0 lab, Mica backdrop): solid fill that never
+    // lets the wallpaper through, while keeping the glass decorations (top
+    // inner highlight, hairline border, noise). The production shell does not
+    // use this property yet.
+    property bool opaque: false
     // Test/behavior hook: expose the effective fill color so QML tests can
     // assert Safe tier degrades to an opaque surface.
     readonly property color fillColor: fill.color
@@ -34,13 +39,15 @@ Item {
         // Safe tier degrades to an opaque surface; Balanced/Premium use glass.
         color: Theme.visualQuality === "safe"
             ? Theme.tokens.color.bgSurface
-            : Theme.tokens.material.glassFill
+            : root.opaque
+                ? Theme.tokens.color.bgSurface
+                : Theme.tokens.material.glassFill
         border.color: Theme.tokens.color.border
         border.width: 1
 
         // Top inner highlight: the light catching the material.
         Rectangle {
-            visible: Theme.visualQuality !== "safe"
+            visible: root.opaque || Theme.visualQuality !== "safe"
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
@@ -53,7 +60,7 @@ Item {
         }
         // Deeper bottom edge reads as the material's thickness.
         Rectangle {
-            visible: Theme.visualQuality !== "safe"
+            visible: root.opaque || Theme.visualQuality !== "safe"
             anchors.bottom: parent.bottom
             anchors.left: parent.left
             anchors.right: parent.right

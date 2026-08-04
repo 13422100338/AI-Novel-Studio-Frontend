@@ -107,6 +107,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         engine.load(QUrl.fromLocalFile(str(visual_lab_qml_path())))
         if not engine.rootObjects():
             return 1
+        # Optional Windows 11 system backdrop (Mica): the lab window becomes
+        # transparent so DWM draws the wallpaper blur behind it; the QML page
+        # switches to its "backdrop" material layout. False is fine on older
+        # Windows / offscreen rendering: the page renders the normal theme.
+        from ai_novel_studio.ui_qml.bridge.windows_backdrop import (
+            apply_system_backdrop,
+        )
+
+        lab_window = engine.rootObjects()[0]
+        lab_window.setProperty(
+            "systemBackdrop", apply_system_backdrop(lab_window, kind="mica")
+        )
         return app.exec()
     engine.rootContext().setContextProperty("WritingPageUseWebEngine", use_webengine)
     if use_webengine:

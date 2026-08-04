@@ -6,6 +6,10 @@ Usage (from the worktree root, using its venv):
 The original filenames (visual-lab-*.png) are the pre-rework "before" shots and
 are kept untouched. The rework adds real-time Acrylic surfaces, so this script
 now writes `visual-lab-glass-*.png` "after" shots plus a material-compare crop.
+
+Pass `--windowed` on a real Windows 11 machine to capture the Mica system
+backdrop (wallpaper blur behind the window); the default offscreen mode keeps
+the in-app backdrop path (Mica cannot render offscreen).
 """
 
 from __future__ import annotations
@@ -14,10 +18,6 @@ import os
 import sys
 import time
 from pathlib import Path
-
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-os.environ.setdefault("QT_QUICK_BACKEND", "software")
-os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
@@ -56,6 +56,12 @@ def _find_item(root: QQuickItem, name: str) -> QQuickItem | None:
 
 
 def main() -> int:
+    windowed = "--windowed" in sys.argv
+    if not windowed:
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    os.environ.setdefault("QT_QUICK_BACKEND", "software")
+    os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
+
     app = QGuiApplication(sys.argv)
     engine = QQmlApplicationEngine()
     engine.addImportPath(str(Path(visual_lab_qml_path()).parent))
@@ -63,8 +69,15 @@ def main() -> int:
     engine.load(QUrl.fromLocalFile(str(visual_lab_qml_path())))
     root = engine.rootObjects()[0]
     assert isinstance(root, QQuickWindow), "VisualLab window expected"
+    from ai_novel_studio.ui_qml.bridge.windows_backdrop import (
+        apply_system_backdrop,
+    )
+
+    root.setProperty(
+        "systemBackdrop", apply_system_backdrop(root, kind="mica")
+    )
     root.show()
-    _pump(app, 12)
+    _pump(app, 30 if windowed else 12)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     combos = (
