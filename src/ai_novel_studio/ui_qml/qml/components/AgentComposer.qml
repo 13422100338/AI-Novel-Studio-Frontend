@@ -12,6 +12,7 @@ ColumnLayout {
 
     ContextReferenceChip {
         objectName: "selectionReferenceChip"
+        Layout.fillWidth: true
         opacity: Facade.hasSelectionReference ? 1 : 0
         visible: opacity > 0.01
         label: Facade.selectionReferenceLabel

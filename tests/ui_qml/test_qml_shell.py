@@ -9,6 +9,7 @@ from pytestqt.qtbot import QtBot
 from ai_novel_studio.ui_qml.bootstrap import app_qml_path, register_frontend_types
 from ai_novel_studio.ui_qml.bridge.backend_availability import BACKEND_AVAILABLE
 from ai_novel_studio.ui_qml.bridge.dtos import AgentTimelineItemDto
+from ai_novel_studio.ui_qml.bridge.hash_utils import fnv1a_hash
 from ai_novel_studio.ui_qml.bridge.mock_novel_studio_facade import MockNovelStudioFacade
 from ai_novel_studio.ui_qml.bridge.theme_provider import ThemeProvider
 
@@ -209,6 +210,54 @@ def test_textarea_host_renders_creative_agent_panel(qtbot: QtBot) -> None:
     panel = _find_visible_quick_item(window.contentItem(), "creativeAgentPanel")
     assert panel is not None
     assert window.findChild(object, "aiDrawer") is not None
+
+
+def test_selection_chip_lays_out_label_preview_and_close_side_by_side(
+    qtbot: QtBot,
+) -> None:
+    """C1.4 regression: the selection chip must span the composer width.
+
+    The chip previously had no implicitWidth (Rectangle default 0), so its
+    inner RowLayout collapsed and the chapter label, preview and close button
+    all stacked at x=0 and overlapped.
+    """
+    engine, facade, _ = _load_engine(qtbot)
+    window = engine.rootObjects()[0]
+    facade.toggleAiDrawer(True)
+
+    selected_text = "清晨的雾港"
+    facade.setSelectionReferenceJson(
+        '{"chapterId":"chapter-1","baseRevision":3,"from":0,"to":6,'
+        f'"selectedText":"{selected_text}",'
+        f'"selectedTextHash":"{fnv1a_hash(selected_text)}"}}'
+    )
+
+    qtbot.waitUntil(
+        lambda: _find_visible_quick_item(
+            window.contentItem(), "selectionReferenceChip"
+        )
+        is not None,
+        timeout=5000,
+    )
+    qtbot.wait(300)  # let the 150ms fade-in settle
+    chip = _find_visible_quick_item(window.contentItem(), "selectionReferenceChip")
+    assert chip is not None
+    assert chip.width() > 0, "chip collapsed to zero width"
+
+    texts = []
+    for child in chip.childItems():
+        for leaf in child.childItems():
+            value = leaf.property("text")
+            if isinstance(value, str) and value:
+                texts.append((leaf, value))
+    texts.sort(key=lambda pair: pair[0].x())
+    assert len(texts) >= 3, f"expected label/preview/close, got {[t for _, t in texts]}"
+    for index in range(len(texts) - 1):
+        left = texts[index][0]
+        right = texts[index + 1][0]
+        assert left.x() + left.width() <= right.x() + 1, (
+            f"{texts[index][1][:12]} overlaps {texts[index + 1][1][:12]}"
+        )
 
 
 def test_agent_dock_open_close_and_collapse(qtbot: QtBot) -> None:
