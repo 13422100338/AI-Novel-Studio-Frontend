@@ -27,7 +27,15 @@ ApplicationWindow {
     // backdrop (Mica) was applied: the window turns transparent so the
     // wallpaper blur behind the window shows through the lab backdrop.
     property bool systemBackdrop: false
-    color: root.systemBackdrop ? "transparent" : Theme.tokens.color.bgCanvas
+    // Mica is active only for Balanced/Premium; Safe keeps a fully opaque
+    // window so the wallpaper never shows through (spec 11: Safe = 实色背景).
+    readonly property bool micaActive:
+        root.systemBackdrop && Theme.visualQuality !== "safe"
+    // Premium uses Desktop Acrylic (brighter); let slightly more wallpaper
+    // through than Balanced so the quality tiers read differently.
+    readonly property real backdropWashAlpha:
+        Theme.visualQuality === "premium" ? 0.66 : 0.80
+    color: root.micaActive ? "transparent" : Theme.tokens.color.bgCanvas
     font.family: Theme.tokens.font.ui
 
     // Helper: theme color with a low alpha (background decorations only).
@@ -71,22 +79,22 @@ ApplicationWindow {
         // tint + noise). Active only when the system backdrop succeeded.
         Item {
             anchors.fill: parent
-            visible: root.systemBackdrop
+            visible: root.micaActive
 
             Rectangle {
                 anchors.fill: parent
                 gradient: Gradient {
                     GradientStop {
                         position: 0.0
-                        color: root.tint(Theme.tokens.color.bgCanvas, 0.84)
+                        color: root.tint(Theme.tokens.color.bgCanvas, root.backdropWashAlpha)
                     }
                     GradientStop {
                         position: 0.55
-                        color: root.tint(Theme.tokens.color.bgCanvas, 0.74)
+                        color: root.tint(Theme.tokens.color.bgCanvas, root.backdropWashAlpha - 0.10)
                     }
                     GradientStop {
                         position: 1.0
-                        color: root.tint(Theme.tokens.color.bgCanvas, 0.78)
+                        color: root.tint(Theme.tokens.color.bgCanvas, root.backdropWashAlpha - 0.06)
                     }
                 }
             }
@@ -100,7 +108,7 @@ ApplicationWindow {
         // in-app decorations are hidden to keep the material honest.
         Rectangle {
             anchors.fill: parent
-            visible: !root.systemBackdrop
+            visible: !root.micaActive
             gradient: Gradient {
                 GradientStop {
                     position: 0.0
@@ -120,7 +128,7 @@ ApplicationWindow {
         // Notebook hairlines give the blur something fine to smear.
         Repeater {
             model: 4
-            visible: !root.systemBackdrop
+            visible: !root.micaActive
             Rectangle {
                 x: parent.width * (0.16 + index * 0.22)
                 y: parent.height * 0.10
@@ -133,7 +141,7 @@ ApplicationWindow {
 
         // Soft color fields (low saturation, calm; spec 4.1 "avoid RGB").
         Rectangle {
-            visible: !root.systemBackdrop
+            visible: !root.micaActive
             x: parent.width * 0.03
             y: parent.height * 0.16
             width: parent.width * 0.24
@@ -142,7 +150,7 @@ ApplicationWindow {
             color: root.tint(Theme.tokens.color.accent, 0.07)
         }
         Rectangle {
-            visible: !root.systemBackdrop
+            visible: !root.micaActive
             x: parent.width * 0.70
             y: parent.height * 0.18
             width: parent.width * 0.24
@@ -151,7 +159,7 @@ ApplicationWindow {
             color: root.tint(Theme.tokens.color.accent, 0.06)
         }
         Rectangle {
-            visible: !root.systemBackdrop
+            visible: !root.micaActive
             x: parent.width * 0.60
             y: parent.height * 0.54
             width: parent.width * 0.32
@@ -160,7 +168,7 @@ ApplicationWindow {
             color: root.tint(Theme.tokens.color.accent, 0.05)
         }
         Rectangle {
-            visible: !root.systemBackdrop
+            visible: !root.micaActive
             x: parent.width * 0.38
             y: parent.height * 0.22
             width: parent.width * 0.12
@@ -171,7 +179,7 @@ ApplicationWindow {
 
         // Manuscript excerpt card (behind the AI glass column).
         Rectangle {
-            visible: !root.systemBackdrop
+            visible: !root.micaActive
             x: parent.width * 0.035
             y: parent.height * 0.52
             width: parent.width * 0.26
@@ -214,7 +222,7 @@ ApplicationWindow {
 
         // Outline card (behind the Agent card column).
         Rectangle {
-            visible: !root.systemBackdrop
+            visible: !root.micaActive
             x: parent.width * 0.69
             y: parent.height * 0.72
             width: parent.width * 0.27
@@ -271,6 +279,17 @@ ApplicationWindow {
                 text: "暖色纸张 + 冷色智能玻璃 · 系统背板（壁纸透出）与实时 Acrylic 仅在本实验页评估（正式界面未改动）"
                 font.pixelSize: 11
                 color: Theme.tokens.color.textSecondary
+            }
+            // Live confirmation of the DWM system backdrop; hidden on the
+            // offscreen path where Mica cannot render.
+            StatusChip {
+                objectName: "labBackdropStatusChip"
+                visible: root.systemBackdrop
+                label: "系统背板"
+                value: Theme.visualQuality === "safe"
+                    ? "Safe 关闭"
+                    : Theme.visualQuality === "premium" ? "Desktop Acrylic" : "Mica"
+                tone: Theme.visualQuality === "safe" ? "warning" : "success"
             }
             Item {
                 Layout.fillWidth: true
@@ -353,7 +372,7 @@ ApplicationWindow {
                         objectName: "labAcrylicSurface"
                         anchors.fill: parent
                         sourceItem: backgroundLayer
-                        visible: !root.systemBackdrop
+                        visible: !root.micaActive
                     }
 
                     GlassSurface {
@@ -361,7 +380,7 @@ ApplicationWindow {
                         objectName: "labGlassSurface"
                         anchors.fill: parent
                         opaque: true
-                        visible: root.systemBackdrop
+                        visible: root.micaActive
                     }
 
                     ColumnLayout {
@@ -672,7 +691,7 @@ ApplicationWindow {
                                 }
                                 AcrylicSurface {
                                     objectName: "labAcrylicCompare"
-                                    visible: !root.systemBackdrop
+                                    visible: !root.micaActive
                                     Layout.preferredWidth: 150
                                     Layout.fillHeight: true
                                     sourceItem: backgroundLayer
@@ -698,7 +717,7 @@ ApplicationWindow {
                                 // window backdrop only; panels stay opaque.
                                 Rectangle {
                                     objectName: "labMicaCompare"
-                                    visible: root.systemBackdrop
+                                    visible: root.micaActive
                                     Layout.preferredWidth: 150
                                     Layout.fillHeight: true
                                     radius: Theme.tokens.radius.r12

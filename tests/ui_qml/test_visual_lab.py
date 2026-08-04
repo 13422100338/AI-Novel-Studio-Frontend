@@ -196,6 +196,45 @@ def test_system_backdrop_mode_switches_to_opaque_glass(qtbot: QtBot) -> None:
     assert window.property("color").alpha() == 255
 
 
+def test_system_backdrop_quality_tiers_are_distinct(qtbot: QtBot) -> None:
+    """Mica mode must differentiate Safe/Balanced/Premium visibly."""
+    _, _, theme, window = _load_lab(qtbot)
+    content = _content(window)
+    acrylic = _find_item(content, "labAcrylicSurface")
+    glass = _find_item(content, "labGlassSurface")
+    mica_compare = _find_item(content, "labMicaCompare")
+    chip = _find_item(content, "labBackdropStatusChip")
+    assert acrylic is not None and glass is not None
+    assert mica_compare is not None and chip is not None
+
+    window.setProperty("systemBackdrop", True)
+    qtbot.waitUntil(lambda: glass.property("visible") is True)
+
+    # Balanced: transparent window + Mica wash + opaque glass panel.
+    assert theme.property("visualQuality") == "balanced"
+    assert window.property("micaActive") is True
+    assert window.property("color").alpha() == 0
+    assert abs(float(window.property("backdropWashAlpha")) - 0.80) < 0.01
+    assert chip.property("value") == "Mica"
+
+    # Safe: fully opaque window, wallpaper hidden, in-app Acrylic path back.
+    theme.setVisualQuality("safe")
+    qtbot.waitUntil(lambda: window.property("color").alpha() == 255)
+    assert window.property("micaActive") is False
+    assert acrylic.property("visible") is True
+    assert glass.property("visible") is False
+    assert mica_compare.property("visible") is False
+    assert chip.property("value") == "Safe 关闭"
+
+    # Premium: transparent again with a lighter wash (Desktop Acrylic).
+    theme.setVisualQuality("premium")
+    qtbot.waitUntil(lambda: window.property("micaActive") is True)
+    assert window.property("color").alpha() == 0
+    assert abs(float(window.property("backdropWashAlpha")) - 0.66) < 0.01
+    assert glass.property("visible") is True
+    assert chip.property("value") == "Desktop Acrylic"
+
+
 def test_streaming_glow_degrades_with_reduce_motion(qtbot: QtBot) -> None:
     _, facade, _, window = _load_lab(qtbot)
     glow = _find_item(_content(window), "labStreamingGlow")

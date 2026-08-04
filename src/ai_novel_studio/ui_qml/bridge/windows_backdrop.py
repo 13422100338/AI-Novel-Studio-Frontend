@@ -30,11 +30,13 @@ _DWMWA_SYSTEMBACKDROP_TYPE = 38
 DWMSBT_MAINWINDOW = 2
 DWMSBT_TRANSIENTWINDOW = 3
 DWMSBT_TABBEDWINDOW = 4
+DWMSBT_NONE = 1
 
 # Windows 11 22H2 (first build with the documented system-backdrop enum).
 _MIN_BUILD = 22621
 
 _BACKDROP_KINDS = {
+    "none": DWMSBT_NONE,
     "mica": DWMSBT_MAINWINDOW,
     "acrylic": DWMSBT_TRANSIENTWINDOW,
     "mica-alt": DWMSBT_TABBEDWINDOW,

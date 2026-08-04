@@ -119,6 +119,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         lab_window.setProperty(
             "systemBackdrop", apply_system_backdrop(lab_window, kind="mica")
         )
+
+        # Quality tiers map to different DWM backdrops so switching is visible:
+        # Safe = no system backdrop (opaque window), Balanced = Mica,
+        # Premium = Desktop Acrylic (brighter). Re-applies on every change;
+        # failures are silently ignored (the window stays normal).
+        def _sync_system_backdrop(quality: str) -> None:
+            kind = {"safe": "none", "balanced": "mica", "premium": "acrylic"}.get(
+                quality, "mica"
+            )
+            apply_system_backdrop(lab_window, kind=kind)
+
+        theme.quality_changed.connect(_sync_system_backdrop)
         return app.exec()
     engine.rootContext().setContextProperty("WritingPageUseWebEngine", use_webengine)
     if use_webengine:

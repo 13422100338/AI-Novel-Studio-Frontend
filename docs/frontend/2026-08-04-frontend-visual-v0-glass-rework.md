@@ -104,11 +104,25 @@
 - 截图脚本新增 `--windowed` 参数，用于真机捕获 Mica 效果；默认 offscreen
   模式不受影响。
 
+质量档在 Mica 模式下必须肉眼可区分（用户反馈“三档看不出区别”后的返工）：
+
+- **Safe**：`DwmSetWindowAttribute(38, DWMSBT_NONE)` 关闭系统背板 + 窗口
+  恢复不透明主题色——壁纸完全不透出，回到应用内 Acrylic 路径（Safe 渲染为
+  实色面板）；
+- **Balanced**：Mica（`DWMSBT_MAINWINDOW`），窗口透明，壁纸经半透明主题
+  洗白层透出（wash alpha 0.80），面板为不透壁纸的玻璃；
+- **Premium**：Desktop Acrylic（`DWMSBT_TRANSIENTWINDOW`，更亮），洗白层
+  更薄（alpha 0.66），壁纸透出更明显；
+- 档位切换时 Python 监听 `Theme.quality_changed` 重新下发对应 DWM 背板
+  （失败静默忽略，窗口保持正常渲染）；
+- 顶栏新增「系统背板」状态芯片，实时显示 `Safe 关闭 / Mica / Desktop Acrylic`，
+  用于确认 DWM 调用是否真的生效（offscreen 路径自动隐藏）。
+
 ## 4. 验证
 
 ```text
-pytest（独立前端）    153 passed, 35 skipped
-pytest（c9a2 集成）   229 passed
+pytest（独立前端）    154 passed, 35 skipped
+pytest（c9a2 集成）   230 passed
 ruff                 通过
 mypy                 通过（42 files）
 ```
