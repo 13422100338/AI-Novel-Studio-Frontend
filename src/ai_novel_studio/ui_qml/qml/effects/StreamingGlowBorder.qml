@@ -1,83 +1,92 @@
 import QtQuick
 
-// Restrained "streaming" border (ideal-UI spec 8): a slow 2.8s hue drift on a
-// 1.5px hairline around the *currently active* Agent card. One or two live
-// instances at most; success/error/cancelled snap to their static state color.
-// reduceMotion degrades to a static highlight (no movement, no flicker).
+// StreamingGlowBorder — neon energy flow around the *currently active* Agent
+// surface (redesigned per user direction, glassmorphism-ui-log.md §24).
 //
-// "Carriage" highlight (user clarification, glassmorphism-ui-log.md ?23):
-// the state border is the track and a short capsule travels along it like a
-// train car seen from above - its width is slightly wider than the 1.5px
-// border, both ends taper back to the track (rounded capsule ends), and the
-// shape breathes subtly (length/width/opacity micro-pulse) while moving.
-// The capsule keeps the state color (slightly brightened), never whitened.
-// reduceMotion freezes both the lap and the pulse (gentler, not zero).
+// A light point with a fading tail and a soft halo travels the FULL rounded
+// rectangle perimeter at constant speed, like energy flowing in a neon tube:
+//   - one Canvas overlay paints the whole effect in a single pass: the bright
+//     core (~4-8px), a ~20-40px tail with exponential falloff sampled behind
+//     the point, and a low-alpha outer halo. No solid capsule, no top bar.
+//   - position/tangent come from a perimeter parameterization (pathPoint /
+//     pathAngle over the 4 straight edges and 4 corner arcs), so the light
+//     hugs the border centerline and passes top, right, bottom and left.
+//   - the overlay only covers the card, never participates in layout and
+//     never touches width/height/implicitHeight; no MouseArea, so content and
+//     buttons stay interactive and uncovered.
+//   - state machine: thinking/generating loop; success/error sweep once;
+//     cancelled fades out once; idle = plain static border.
+//   - animations stop when hidden, window minimized, or reduceMotion.
+//   - Safe tier / missing Facade degrade to the static highlight border.
 Item {
     id: root
 
     property bool active: false
-    property string state: "" // "" | success | error | cancelled
+    // "" | "thinking" | "generating" | "success" | "error" | "cancelled" |
+    // "idle"
+    property string state: ""
     property real radius: 12
     property real glowWidth: 1.5
 
-    // Guarded like AppButton: the Facade context property can be null during
-    // early binding; `=== null` is unreliable for QObject context values, so
-    // use typeof + truthiness (see §18.2).
+    // Neon parameters: core diameter ~4-8px, tail ~20-40px, halo ~8-12px.
+    property real coreRadius: 3.0
+    property real tailLength: 30
+    property real haloRadius: 10
+    property int tailSamples: 24
+    property int flowDuration: 2200
+    property int fadeDuration: 700
+
+    // Guarded Facade access (context property can be null early; `=== null`
+    // is unreliable for QObject context values — see §18.2).
     readonly property bool reduce:
         typeof Facade !== "undefined" && Facade ? Facade.reduceMotion : false
-    readonly property bool running:
-        root.active && !root.reduce && root.visible && root.state === ""
-    // Test/behavior hook: expose whether the drift animation is live so QML
-    // tests can assert reduceMotion degrades to a static highlight.
-    readonly property bool animationRunning: glowAnim.running
-    // Test/behavior hook: expose the live border color.
+    readonly property bool windowVisible:
+        typeof root.window === "undefined" || root.window === null
+            ? true
+            : root.window.visible
+
+    // State machine ------------------------------------------------
+    readonly property bool looping:
+        root.active
+        && (root.state === "" || root.state === "thinking"
+            || root.state === "generating")
+    readonly property bool singleShot:
+        root.active
+        && (root.state === "success" || root.state === "error")
+    readonly property bool fadingOut:
+        root.active && root.state === "cancelled"
+    readonly property bool idleStatic:
+        !root.active || root.state === "idle" || root.reduce
+        || !root.windowVisible
+
+    // The flowing layer is painted only while all conditions hold.
+    readonly property bool neonActive:
+        root.active
+        && root.visible
+        && !root.reduce
+        && root.windowVisible
+        && !root.singleFinished
+        && !root.cancelFaded
+
+    // Animation/test hooks -----------------------------------------
+    readonly property bool animationRunning: flowAnim.running || singleAnim.running
+    readonly property bool loopAnimRunning: flowAnim.running
+    readonly property bool fadeAnimRunning: fadeAnim.running
+    // Test/behavior hook: the live static border color.
     readonly property color frameColor: frame.border.color
-    // Test/behavior hook: whether the comet lap animation is live.
-    readonly property bool cometAnimRunning: cometAnim.running
-    // Test/behavior hook: whether the capsule should travel (visible + active
-    // + motion allowed).
-    readonly property bool cometRunning:
-        root.active && !root.reduce && root.visible
+    property bool singleFinished: false
+    property bool cancelFaded: false
+    property real phase: 0.0
+    // Test hook: canvas repaint counter (proves the overlay repaints as the
+    // phase advances).
+    property int paintCount: 0
 
-    // Carriage progress 0..1 (one full lap around the rounded-rect border)
-    // and pulse phase 0..1 (one breathing cycle). Exposed so tests can assert
-    // the path/angle functions and park the carriage at known positions.
-    property real cometProgress: 0.0
-    property real pulsePhase: 0.0
-    property int cometDuration: 2200
-    property int pulseDuration: 1500
-    // Carriage dimensions: length along the track (~26px), breadth slightly
-    // wider than the 1.5px border (3.5px -> ~1px overhang each side).
-    property real carriageLength: 26
-    property real carriageBreadth: 3.5
-    // Breathing amplitude: breadth +-10%, length +-6%, opacity 0.85..1.0.
-    property real pulseBreadthAmplitude: 0.10
-    property real pulseLengthAmplitude: 0.06
-    // Carriage visual geometry (card-local), driven by property bindings so
-    // the render pipeline repaints on every progress change without a manual
-    // requestPaint (which does not follow animations on software rendering).
-    readonly property real cometVisualX: root.cometPosition(root.cometProgress).x
-    readonly property real cometVisualY: root.cometPosition(root.cometProgress).y
-    readonly property real cometVisualAngle: root.pathAngle(root.cometProgress)
-    readonly property real cometVisualLength:
-        root.carriageLength
-        * (1 + root.pulseLengthAmplitude
-            * Math.sin(root.pulsePhase * 2 * Math.PI + 0.5))
-    readonly property real cometVisualBreadth:
-        root.carriageBreadth
-        * (1 + root.pulseBreadthAmplitude
-            * Math.sin(root.pulsePhase * 2 * Math.PI))
-    readonly property real cometVisualOpacity:
-        0.85 + 0.15 * Math.sin(root.pulsePhase * 2 * Math.PI + 1.2)
-    // Test/behavior hook: the carriage fill color (state color, slightly
-    // brightened, never whitened).
-    readonly property color cometColor:
-        Qt.lighter(root.staticColor, 1.18)
-    readonly property bool pulseAnimRunning: pulseAnim.running
+    onStateChanged: {
+        root.singleFinished = false
+        root.cancelFaded = false
+    }
 
-    // Path sampling: split the rounded-rect perimeter into segments and walk
-    // them; returns the point at `progress` (0..1) on the border centerline.
-    // Pure functions on the root so tests can call them from this scope.
+    // Perimeter parameterization ------------------------------------
     function pathPoint(t, w, h, r) {
         const pi = Math.PI
         const straight = Math.max(0, w - 2 * r)
@@ -108,10 +117,6 @@ Item {
             { from: pi / 2, to: pi },       // bottom-right -> bottom-left
             { from: pi, to: 3 * pi / 2 }    // bottom-left -> top-left
         ]
-        // The arc segments follow their *destination* corner: seg1 ends at the
-        // top-right corner, seg3 at bottom-right, seg5 at bottom-left, seg7
-        // back at top-left. Using the start corner made the first arc double
-        // back to the top-left (visible fold-back at ~0.33 of the lap).
         const cornerIndex = (Math.floor(index / 2) + 1) % 4
         const c = corners[cornerIndex]
         if (index % 2 === 1) {
@@ -134,21 +139,6 @@ Item {
         return Qt.point(0, h - r - vertical * frac)
     }
 
-    function cometPosition(progress) {
-        const w = root.width
-        const h = root.height
-        const r = Math.min(root.radius, w / 2, h / 2)
-        return root.pathPoint(
-            Math.max(0, Math.min(1, progress)),
-            w,
-            h,
-            r
-        )
-    }
-
-    // Tangent angle (degrees, clockwise) at `progress` so the capsule stays
-    // aligned with the track: straight edges are fixed (top 0, right 90,
-    // bottom 180, left 270) and corner arcs rotate linearly between them.
     function pathAngle(t) {
         const w = root.width
         const h = root.height
@@ -193,6 +183,7 @@ Item {
         return 270 + 90 * frac
     }
 
+    // Static fallback border (Safe / reduceMotion / idle / shader n/a).
     Rectangle {
         id: frame
         anchors.fill: parent
@@ -218,90 +209,124 @@ Item {
         return Theme.tokens.agent.thinkingA
     }
 
-    SequentialAnimation {
-        id: glowAnim
-        running: root.running
-        loops: Animation.Infinite
-        ColorAnimation {
-            target: frame
-            property: "border.color"
-            from: Theme.tokens.agent.thinkingA
-            to: Theme.tokens.agent.thinkingB
-            duration: Theme.tokens.motion.glowCycle / 2
-            easing.type: Easing.InOutSine
-        }
-        ColorAnimation {
-            target: frame
-            property: "border.color"
-            from: Theme.tokens.agent.thinkingB
-            to: Theme.tokens.agent.thinkingA
-            duration: Theme.tokens.motion.glowCycle / 2
-            easing.type: Easing.InOutSine
+    // Neon overlay: one Canvas paints core + tail + halo in a single pass.
+    Canvas {
+        id: neonCanvas
+        objectName: "neonOverlay"
+        anchors.fill: parent
+        visible: root.neonActive
+        enabled: root.neonActive
+
+        onWidthChanged: neonCanvas.requestPaint()
+        onHeightChanged: neonCanvas.requestPaint()
+
+        onPaint: {
+            root.paintCount += 1
+            const ctx = neonCanvas.getContext("2d")
+            ctx.reset()
+            const w = neonCanvas.width
+            const h = neonCanvas.height
+            if (w < 4 || h < 4) {
+                return
+            }
+            const r = Math.min(root.radius, w / 2, h / 2)
+            const center = root.pathPoint(root.phase, w, h, r)
+            const angleRad = root.pathAngle(root.phase) * Math.PI / 180
+            const tx = Math.cos(angleRad)
+            const ty = Math.sin(angleRad)
+            const c = root.staticColor
+            const col = function (alpha) {
+                return "rgba("
+                    + Math.round(c.r * 255) + ","
+                    + Math.round(c.g * 255) + ","
+                    + Math.round(c.b * 255) + ","
+                    + alpha.toFixed(3) + ")"
+            }
+
+            // Low-alpha outer halo (soft, no solid capsule).
+            ctx.fillStyle = col(0.14)
+            ctx.beginPath()
+            ctx.arc(center.x, center.y, root.haloRadius, 0, 2 * Math.PI)
+            ctx.fill()
+
+            // Fading tail behind the point (exponential falloff, shrinks).
+            for (let i = 1; i <= root.tailSamples; i++) {
+                const k = i / root.tailSamples
+                const dist = k * root.tailLength
+                const px = center.x - tx * dist
+                const py = center.y - ty * dist
+                const alpha = 0.55 * Math.pow(1 - k, 1.8)
+                const rad = root.coreRadius * (1 - 0.35 * k)
+                ctx.fillStyle = col(alpha)
+                ctx.beginPath()
+                ctx.arc(px, py, Math.max(0.6, rad), 0, 2 * Math.PI)
+                ctx.fill()
+            }
+
+            // Bright core (~4-8px), state-colored, never whitened.
+            ctx.fillStyle = col(1.0)
+            ctx.beginPath()
+            ctx.arc(center.x, center.y, root.coreRadius, 0, 2 * Math.PI)
+            ctx.fill()
         }
     }
 
-    // The carriage: a short capsule traveling along the border like a train
-    // car on its track - length along the tangent, breadth a bit wider than
-    // the border, rounded ends tapering back to the track, state-colored
-    // (slightly brightened, never whitened) and breathing subtly. Driven by
-    // bindings on x/y/rotation/width/height/opacity so the render pipeline
-    // repaints automatically (Canvas requestPaint does not follow animations
-    // on software rendering); no layout property animates.
-    Item {
-        id: cometVisual
-        objectName: "streamingComet"
-        visible: root.active
-        x: root.cometVisualX - cometVisual.width / 2
-        y: root.cometVisualY - cometVisual.height / 2
-        width: root.cometVisualLength
-        height: root.cometVisualBreadth
-        rotation: root.cometVisualAngle
-        opacity: root.cometVisualOpacity
+    // Keep repainting every frame while the neon is live. The NumberAnimation
+    // drives `phase`; this tick is a belt-and-braces repaint trigger so the
+    // overlay always follows the phase even on renderers where a binding-only
+    // requestPaint would be coalesced.
+    Timer {
+        id: repaintTick
+        interval: 16
+        repeat: true
+        running: root.neonActive
+        onTriggered: neonCanvas.requestPaint()
+    }
 
-        // Soft outer glow capsule: state color, wider than the track so the
-        // carriage reads as slightly overhanging the rails.
-        Rectangle {
-            anchors.fill: parent
-            radius: height / 2
-            color: Qt.rgba(
-                root.cometColor.r,
-                root.cometColor.g,
-                root.cometColor.b,
-                0.30
-            )
-            scale: 1.55
-        }
-        // Solid carriage body: rounded ends taper back to the track.
-        Rectangle {
-            anchors.fill: parent
-            radius: height / 2
-            color: root.cometColor
+    onPhaseChanged: {
+        if (root.neonActive) {
+            neonCanvas.requestPaint()
         }
     }
 
+    // Loop: thinking / generating keep flowing.
     NumberAnimation {
-        id: cometAnim
+        id: flowAnim
         target: root
-        property: "cometProgress"
+        property: "phase"
         from: 0
         to: 1
-        duration: root.cometDuration
+        duration: root.flowDuration
         loops: Animation.Infinite
-        running: root.cometRunning
+        running: root.looping && root.neonActive
         easing.type: Easing.Linear
     }
 
-    // Shape breathing: a separate, slower cycle that slightly changes the
-    // carriage length/breadth/opacity while it travels (???????).
+    // Single sweep: success / error play once and stop.
     NumberAnimation {
-        id: pulseAnim
+        id: singleAnim
         target: root
-        property: "pulsePhase"
+        property: "phase"
         from: 0
         to: 1
-        duration: root.pulseDuration
-        loops: Animation.Infinite
-        running: root.cometRunning
-        easing.type: Easing.InOutSine
+        duration: root.flowDuration
+        loops: 1
+        running: root.singleShot && root.neonActive && !root.singleFinished
+        easing.type: Easing.Linear
+        onFinished: root.singleFinished = true
+    }
+
+    // Cancelled: fade the neon out once, then stay gone.
+    NumberAnimation {
+        id: fadeAnim
+        target: neonCanvas
+        property: "opacity"
+        from: 1.0
+        to: 0.0
+        duration: root.fadeDuration
+        loops: 1
+        running: root.fadingOut && root.neonActive && !root.cancelFaded
+        easing.type: Easing.OutCubic
+        onFinished: root.cancelFaded = true
     }
 }

@@ -774,6 +774,68 @@ scale(0)/ease-in；路径连续性有测试锁定。
 **Verdict: Approve**——纯状态色、胶囊两端收缩、切向旋转、双周期微变、
 全部属性绑定驱动（无布局动画）、reduceMotion 冻结移动与呼吸。
 
+## 24. 追加（2026-08-05）：霓虹流光重做——回滚胶囊/短横条方案
+
+用户明确否定 §23 的“顶部彩色胶囊/短横条”：需要的是**一颗带渐变拖尾和
+柔和辉光的光点沿圆角矩形边框完整周长连续、匀速漂移**（霓虹灯管能量流动）。
+本轮按用户 15 条规格 + 推荐实现重做，并在独立 Visual Lab 验证。
+
+### 24.1 实现（StreamingGlowBorder.qml 整文件重写）
+
+- **单层 Canvas 一次绘制**（用户推荐 ShaderEffect；Qt6 ShaderEffect 只接受
+  qsb 预编译 URL，内联 GLSL 报错且软渲染不可靠，改为 Canvas 等价实现）：
+  - 光点核心：状态色满 alpha 圆（coreRadius 3 → 直径 6px，规格 4-8px）；
+  - 拖尾：沿 -tangent 后方采样 24 个圆，alpha 按 (1-k)^1.8 指数衰减、
+    半径递减，总长 30px（规格 20-40px）；
+  - 外辉光：核心处低透明（α0.14）半径 10px 圆（规格“外围低透明辉光，
+    不能形成实色胶囊”）。
+- **完整周长**：`pathPoint`（4 直线 + 4 角弧，先前 §22 已修目标角 bug）与
+  `pathAngle`（直线 0/90/180/270、角弧线性过渡）驱动 phase 0..1，光点
+  依次经过上/右/下/左边，贴合边框中心线（圆角处自动转向）。
+- **状态机**（规格 8-13）：thinking/generating 循环（Linear 2.2s）；
+  success/error 单次扫过（loops:1，播完 `singleFinished` 停止，静态边框
+  保留）；cancelled 只淡出一次（OutCubic 700ms）；idle/非 active 仅静态
+  边框；reduceMotion 退化为静态高亮边框。
+- **生命周期**（规格 14）：`neonActive = active && visible && !reduce &&
+  windowVisible && !singleFinished && !cancelFaded`；窗口最小化/隐藏、
+  组件不可见、任务结束（active=false）均停动画。offscreen 下窗口 visible
+  绑定不可靠，测试用组件可见性断言，真机由 windowVisible 兜底。
+- **布局隔离**（规格 6-7）：效果层 anchors.fill 覆盖卡片，无 MouseArea，
+  不参与 width/height/implicitHeight；测试断言动画前后几何完全不变。
+- **并发**（规格 15）：lab 演示一次仅一个状态实例；测试枚举运行实例 ≤2。
+
+### 24.2 Visual Lab 演示
+
+- 新增 320×160 圆角演示卡（neonDemoCard）+ 状态按钮行
+  （idle/thinking/generating/success/error/cancelled/reduced，
+  `labNeonMode-*`），默认 thinking 循环；移除旧的胶囊小状态卡与
+  diff 卡流光（diff 卡改普通静态边框），保证同一时刻唯一运行实例。
+
+### 24.3 验证
+
+- 新增 8 个测试：默认 thinking 循环、shader/Canvas 源契约（core+tail+halo、
+  无胶囊残留标识符）、状态机各模式、单次扫过、reduceMotion 回退、几何
+  不变、不可见停止、并发 ≤2。前端 pytest 187 passed / 35 skipped；ruff
+  通过；mypy（项目配置）通过。
+- **连续截图验收**（offscreen 精确帧 + windowed 真机帧，各 4 张
+  `visual-v0-rework-neon-{top,right,bottom,left}.png`）：亮斑重心
+  phase 0.05→(159.5, 0.7) 顶边、0.45→(318.0, 79.3) 右边、
+  0.70→(159.3, 158.3) 底边、0.90→(1.0, 79.5) 左边——明确经过四条边；
+  截图脚本抓帧前把 flowDuration 拉长冻结相位，避免动画覆盖。
+
+### 24.4 review-animations 自审
+
+| Before（§23 胶囊） | After（§24 霓虹流光） | Why |
+| --- | --- | --- |
+| 实色胶囊/短横块 | 核心+指数衰减拖尾+低透明辉光 | 用户要求“霓虹灯管能量”，无实色块 |
+| 顶部移动或形状块 | phase 驱动沿完整周长匀速 | 规格 1-2：四边+圆角、贴合中心线 |
+| 布局相关对象 | Canvas 覆盖层 anchors.fill | 规格 6-7：不参与布局、不遮挡内容 |
+| 单一状态 | thinking/generating 循环、success/error 单次、cancelled 淡出、idle 静态 | 规格 8-13 状态机 |
+| 无条件运行 | active/visible/windowVisible/reduce 全闸 | 规格 14-15：生命周期与并发上限 |
+
+**Verdict: Approve**——匀速线性、指数衰减拖尾、仅覆盖层绘制（无布局/无
+交互影响）、状态机与生命周期完整、reduceMotion 回退、四边多帧像素证据。
+
 ## 16. 追加（2026-08-04）：Header 玻璃化、控制条边缘统一、资源门禁
 
 “做下一波”收尾：实验页剩余大容器统一玻璃语言，并补齐资源/几何门禁测试。

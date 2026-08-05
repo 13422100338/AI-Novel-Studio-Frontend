@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import QMetaObject, QObject, QUrl, Slot
 from PySide6.QtGui import QColor
-from PySide6.QtQml import QQmlApplicationEngine, QQmlExpression
+from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickItem, QQuickWindow
 from pytestqt.qtbot import QtBot
 
@@ -114,7 +114,12 @@ def test_visual_lab_loads_four_column_workspace(qtbot: QtBot) -> None:
         "labDiffCard",
         "labChangeSetCard",
         "labFormCard",
-        "labStreamingGlow",
+        "neonDemoCard",
+        "labNeonDemoGlow",
+        "labNeonMode-thinking",
+        "labNeonMode-success",
+        "labNeonMode-error",
+        "labNeonMode-reduced",
         "labInputField",
         "experimentOpenButton",
         "experimentControlPanel",
@@ -741,187 +746,181 @@ def test_scrollbar_tier_styling_stays_functional(qtbot: QtBot) -> None:
             float(bar.property("thumbHeight")),
             float(bar.property("thumbY")),
         ) == geometry, f"geometry changed at {quality}"
-def test_streaming_glow_degrades_with_reduce_motion(qtbot: QtBot) -> None:
-    _, facade, _, window = _load_lab(qtbot)
-    glow = _find_item(_content(window), "labStreamingGlow")
+def test_neon_demo_defaults_to_thinking_loop(qtbot: QtBot) -> None:
+    """The neon demo card defaults to the thinking loop state (one active
+    flowing instance)."""
+    _, _, _, window = _load_lab(qtbot)
+    glow = _find_item(_content(window), "labNeonDemoGlow")
+    assert glow is not None
+    assert window.property("neonDemoMode") == "thinking"
+    assert glow.property("active") is True
+    assert bool(glow.property("loopAnimRunning")) is True
+
+
+def test_neon_shader_core_tail_halo_and_no_capsule(qtbot: QtBot) -> None:
+    """Source contract: the effect is one ShaderEffect painting a core, a
+    fading tail and a low-alpha halo along the full perimeter; no capsule /
+    carriage remnants are allowed (user direction ?24)."""
+    source = (
+        Path(__file__).resolve().parent.parent.parent
+        / "src"
+        / "ai_novel_studio"
+        / "ui_qml"
+        / "qml"
+        / "effects"
+        / "StreamingGlowBorder.qml"
+    ).read_text(encoding="utf-8")
+    # One overlay paints core + tail + halo; the perimeter parameterization
+    # covers all four edges and corner arcs (user direction §24).
+    assert "Canvas" in source
+    assert "onPaint" in source
+    assert "pathPoint" in source and "pathAngle" in source
+    assert "coreRadius" in source
+    assert "tailLength" in source and "tailSamples" in source
+    assert "haloRadius" in source
+    assert "function pathPoint" in source              # full perimeter
+    assert "function pathAngle" in source              # tangent direction
+    # Rejected design must not silently return.
+    assert "carriageLength" not in source
+    assert "cometVisualLength" not in source
+    assert "pulsePhase" not in source
+    assert "streamingComet" not in source
+
+
+def test_neon_state_machine_modes(qtbot: QtBot) -> None:
+    """idle static; thinking/generating loop; success/error single sweep;
+    cancelled fades; reduced stays static."""
+    _, _, _, window = _load_lab(qtbot)
+    glow = _find_item(_content(window), "labNeonDemoGlow")
     assert glow is not None
 
-    assert glow.property("animationRunning") is True
-    assert bool(glow.property("cometRunning")) is True
-    assert bool(glow.property("cometAnimRunning")) is True
+    def set_mode(mode: str) -> None:
+        window.setProperty("neonDemoMode", mode)
+        qtbot.wait(40)
+
+    set_mode("idle")
+    assert glow.property("active") is False
+    assert bool(glow.property("loopAnimRunning")) is False
+    assert bool(glow.property("fadeAnimRunning")) is False
+
+    set_mode("thinking")
+    assert glow.property("active") is True
+    assert bool(glow.property("loopAnimRunning")) is True
+    assert glow.property("state") == "thinking"
+
+    set_mode("generating")
+    assert bool(glow.property("loopAnimRunning")) is True
+
+    set_mode("success")
+    assert bool(glow.property("loopAnimRunning")) is False
+    assert glow.property("state") == "success"
+
+    set_mode("error")
+    assert glow.property("state") == "error"
+    assert bool(glow.property("loopAnimRunning")) is False
+
+    set_mode("cancelled")
+    assert glow.property("state") == "cancelled"
+    assert bool(glow.property("loopAnimRunning")) is False
+
+    set_mode("reduced")
+    assert glow.property("state") == "idle"
+    assert bool(glow.property("loopAnimRunning")) is False
+
+
+def test_neon_single_shot_plays_once_then_stops(qtbot: QtBot) -> None:
+    """success/error sweep exactly once; after finishing the neon layer stops
+    while the static state border stays."""
+    _, _, _, window = _load_lab(qtbot)
+    glow = _find_item(_content(window), "labNeonDemoGlow")
+    assert glow is not None
+    glow.setProperty("flowDuration", 80)  # fast sweep for the test
+
+    window.setProperty("neonDemoMode", "success")
+    qtbot.wait(40)
+    assert glow.property("singleFinished") is False
+    assert bool(glow.property("animationRunning")) is True
+
+    qtbot.waitUntil(lambda: glow.property("singleFinished") is True, timeout=1000)
+    assert bool(glow.property("animationRunning")) is False
+    # Static border remains with the state color.
+    assert glow.property("frameColor").name() != "#000000"
+
+
+def test_neon_reduce_motion_static_fallback(qtbot: QtBot) -> None:
+    """reduceMotion keeps the static highlight border and stops the flow."""
+    _, facade, _, window = _load_lab(qtbot)
+    glow = _find_item(_content(window), "labNeonDemoGlow")
+    assert glow is not None
+    assert bool(glow.property("loopAnimRunning")) is True
+
     facade.setReduceMotion(True)
-    qtbot.waitUntil(lambda: glow.property("animationRunning") is False)
-    assert glow.property("frameColor") == "#7C6FD8"  # static thinkingA
-    assert bool(glow.property("cometRunning")) is False
-    assert bool(glow.property("cometAnimRunning")) is False
+    qtbot.waitUntil(lambda: bool(glow.property("loopAnimRunning")) is False)
+    assert glow.property("frameColor").name() == "#7c6fd8"  # static thinkingA
 
 
-def test_state_glow_showcase_runs_comet_on_all_states(qtbot: QtBot) -> None:
-    """thinking / cancelled / error state cards each show the colored border
-    and the traveling bright comet (user request: all three states)."""
+def test_neon_geometry_never_changes(qtbot: QtBot) -> None:
+    """The effect layer must not participate in layout: card and glow keep
+    identical geometry while the loop runs (user direction ?24 item 6)."""
     _, _, _, window = _load_lab(qtbot)
     content = _content(window)
-    for key in ("thinking", "cancelled", "error"):
-        glow = _find_item(content, "labStateGlow-" + key)
-        assert glow is not None, f"missing labStateGlow-{key}"
-        comet = _find_item(glow, "streamingComet")
-        assert comet is not None, f"{key}: comet layer missing"
-        assert glow.property("active") is True
-        assert bool(glow.property("cometRunning")) is True, key
-        assert bool(glow.property("cometAnimRunning")) is True, key
-        assert comet.property("visible") is True
+    card = _find_item(content, "neonDemoCard")
+    glow = _find_item(content, "labNeonDemoGlow")
+    assert card is not None and glow is not None
+
+    baseline = (
+        float(card.property("width")),
+        float(card.property("height")),
+        float(card.property("implicitHeight")),
+        float(glow.property("width")),
+        float(glow.property("height")),
+        float(glow.property("implicitHeight")),
+    )
+    window.setProperty("neonDemoMode", "thinking")
+    qtbot.wait(120)
+    current = (
+        float(card.property("width")),
+        float(card.property("height")),
+        float(card.property("implicitHeight")),
+        float(glow.property("width")),
+        float(glow.property("height")),
+        float(glow.property("implicitHeight")),
+    )
+    assert current == baseline
 
 
-def test_comet_path_follows_rounded_rect_border(qtbot: QtBot) -> None:
-    """The comet position function stays on the rounded-rect border for the
-    whole lap, visits all four edges, and closes the loop."""
-    engine, _, _, window = _load_lab(qtbot)
-    qtbot.wait(250)  # offscreen layout: card geometry settles late
-    glow = _find_item(_content(window), "labStateGlow-thinking")
+def test_neon_stops_when_window_hidden(qtbot: QtBot) -> None:
+    """Animations must stop when the window is hidden/minimized (item 14)."""
+    _, _, _, window = _load_lab(qtbot)
+    glow = _find_item(_content(window), "labNeonDemoGlow")
     assert glow is not None
-    assert float(glow.property("width")) > 0, "card width not laid out"
-    assert float(glow.property("height")) > 0, "card height not laid out"
+    assert bool(glow.property("loopAnimRunning")) is True
 
-    def coord(expression_text: str) -> float:
-        expression = QQmlExpression(engine.rootContext(), glow, expression_text)
-        value = expression.evaluate()
-        assert value is not None and value[0] is not None, (
-            f"{expression_text} failed: {value}"
-        )
-        return float(value[0])
-
-    def pos(p: float) -> tuple[float, float]:
-        return (
-            coord(f"cometPosition({p}).x"),
-            coord(f"cometPosition({p}).y"),
-        )
-
-    width = float(glow.property("width"))
-    height = float(glow.property("height"))
-    radius = float(glow.property("radius"))
-
-    edges_seen = {"top": False, "right": False, "bottom": False, "left": False}
-    previous = None
-    for step in range(51):
-        p = pos(step / 50)
-        x, y = p
-        assert -0.5 <= x <= width + 0.5, p
-        assert -0.5 <= y <= height + 0.5, p
-        # Border band = the four straight edges plus the corner arcs; the arc
-        # coordinates bend inward from the edges, so "on border" means within
-        # radius+1 of at least one side.
-        near_border = (
-            x <= radius + 1.0
-            or x >= width - radius - 1.0
-            or y <= radius + 1.0
-            or y >= height - radius - 1.0
-        )
-        assert near_border, f"off border at {step / 50}: {p}"
-        if abs(y) < 1.0 and radius < x < width - radius:
-            edges_seen["top"] = True
-        if abs(x - width) < 1.0 and radius < y < height - radius:
-            edges_seen["right"] = True
-        if abs(y - height) < 1.0 and radius < x < width - radius:
-            edges_seen["bottom"] = True
-        if abs(x) < 1.0 and radius < y < height - radius:
-            edges_seen["left"] = True
-        if previous is not None:
-            # Motion is continuous: consecutive samples never jump.
-            # A sample step is ~5px of perimeter; the corner arcs project up
-            # to ~12px of x-change per step at the tangent, so 20 is a safe
-            # continuity bound.
-            assert abs(x - previous[0]) < 20 and abs(y - previous[1]) < 20, (
-                f"jump at {step / 50}: {previous} -> {p}"
-            )
-        previous = p
-
-    assert all(edges_seen.values()), f"edges not all visited: {edges_seen}"
-    p0 = pos(0.0)
-    p1 = pos(1.0)
-    assert abs(p0[0] - p1[0]) < 0.01 and abs(p0[1] - p1[1]) < 0.01
+    glow.setProperty("visible", False)
+    qtbot.waitUntil(lambda: bool(glow.property("loopAnimRunning")) is False)
+    glow.setProperty("visible", True)
 
 
-def test_carriage_shape_tangent_and_color(qtbot: QtBot) -> None:
-    """The traveling highlight is a state-colored capsule, not a whitened dot:
-    it is elongated along the track, slightly wider than the border, rotates
-    with the tangent, and never goes white."""
-    engine, facade, _, window = _load_lab(qtbot)
-    qtbot.wait(250)
-    glow = _find_item(_content(window), "labStateGlow-thinking")
-    assert glow is not None
-    facade.setReduceMotion(True)  # freeze lap/pulse for deterministic asserts
-    qtbot.wait(20)
+def test_neon_concurrency_at_most_two(qtbot: QtBot) -> None:
+    """Only one StreamingGlowBorder instance may flow in the lab demo (item 15:
+    at most 1-2 running instances)."""
+    _, _, _, window = _load_lab(qtbot)
+    content = _content(window)
 
-    def value(expression_text: str) -> float:
-        expression = QQmlExpression(engine.rootContext(), glow, expression_text)
-        result = expression.evaluate()
-        assert result is not None and result[0] is not None, (
-            f"{expression_text} failed: {result}"
-        )
-        return float(result[0])
+    def collect_glows(item: QQuickItem) -> list[QQuickItem]:
+        found: list[QQuickItem] = []
+        if item.objectName() == "labNeonDemoGlow":
+            found.append(item)
+        for child in item.childItems():
+            found.extend(collect_glows(child))
+        return found
 
-    # Capsule proportions: length >> breadth, breadth slightly wider than the
-    # 1.5px border but small enough to stay a slim carriage.
-    length = value("cometVisualLength")
-    breadth = value("cometVisualBreadth")
-    assert length > breadth * 3, (length, breadth)
-    assert breadth > float(glow.property("glowWidth")), breadth
-    assert breadth < 8, breadth
-
-    # Color: state family (thinkingA purple-ish), never near-white.
-    color = QColor(str(glow.property("cometColor")))
-    assert color.red() + color.green() + color.blue() < 640, color.name()
-    assert color.name() != "#ffffff"
-
-    # Breathing: advancing the pulse phase changes the capsule dimensions
-    # (the 微小形状变化 the user asked for).
-    glow.setProperty("pulsePhase", 0.0)
-    qtbot.wait(10)
-    base_length = value("cometVisualLength")
-    base_breadth = value("cometVisualBreadth")
-    glow.setProperty("pulsePhase", 0.25)  # sin peak for breadth, off-zero for length
-    qtbot.wait(10)
-    assert abs(value("cometVisualLength") - base_length) > 0.5
-    assert abs(value("cometVisualBreadth") - base_breadth) > 0.1
-
-    # Tangent angle follows the border monotonically (straight edges hold a
-    # cardinal direction, corner arcs interpolate linearly between them), so
-    # the raw angle climbs 0 -> 90 -> 180 -> 270 -> ~360 and wraps to 0 at
-    # the lap seam (the single allowed reverse jump).
-    previous = -1.0
-    wrapped = False
-    crossed: set[int] = set()
-    for step in range(201):
-        angle = value(f"pathAngle({step / 200})")
-        wrap = previous > 300 and angle < 30
-        wrapped = wrapped or wrap
-        assert angle >= previous - 0.01 or wrap, (
-            f"angle reversed at {step / 200}: {previous} -> {angle}"
-        )
-        previous = angle
-        for boundary in (90, 180, 270):
-            if angle >= boundary - 1.0:
-                crossed.add(boundary)
-    # 0 -> 90 -> 180 -> 270, then wraps to 0 at the lap seam (t=1 returns 0,
-    # never 360, so the wrap itself is the fourth boundary check).
-    assert crossed == {90, 180, 270}, crossed
-    assert wrapped, "lap seam wrap missing"
-
-
-def test_carriage_breathing_stops_with_reduce_motion(qtbot: QtBot) -> None:
-    """The subtle shape pulse runs with the lap and freezes under
-    reduceMotion (gentler, not zero: the capsule stays, only motion stops)."""
-    _, facade, _, window = _load_lab(qtbot)
-    glow = _find_item(_content(window), "labStateGlow-thinking")
-    assert glow is not None
-
-    assert bool(glow.property("cometRunning")) is True
-    assert bool(glow.property("pulseAnimRunning")) is True
-
-    facade.setReduceMotion(True)
-    qtbot.waitUntil(lambda: bool(glow.property("cometRunning")) is False)
-    assert bool(glow.property("pulseAnimRunning")) is False
-
+    running = [
+        g for g in collect_glows(content)
+        if bool(g.property("animationRunning")) is True
+    ]
+    assert len(running) == 1
+    assert len(running) <= 2
 
 def test_visual_quality_cycles_safe_balanced_premium(qtbot: QtBot) -> None:
     _, _, theme, _ = _load_lab(qtbot)

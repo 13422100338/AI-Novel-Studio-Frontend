@@ -167,6 +167,33 @@ def main() -> int:
     capture_scrollbar("paper", "visual-v0-rework-scrollbar.png")
     capture_scrollbar("dark", "visual-v0-rework-scrollbar-dark.png")
 
+    # Neon flow showcase (user direction §24): four consecutive frames proving
+    # the light point passes top, right, bottom and left edges of the
+    # 320x160 rounded demo card.
+    def capture_neon_frames(theme_name: str, prefix: str) -> None:
+        theme.setTheme(theme_name)
+        theme.setVisualQuality("premium")
+        root.setProperty("neonDemoMode", "thinking")
+        glow = _find_item(root.contentItem(), "labNeonDemoGlow")
+        assert glow is not None, f"{prefix}: neon glow missing"
+        # Freeze the loop phase (very long duration) so each frame is the
+        # exact requested perimeter position instead of whatever the running
+        # animation happens to be at.
+        glow.setProperty("flowDuration", 60000)
+        _pump(app, 4)
+        for phase, tag in ((0.05, "top"), (0.45, "right"),
+                           (0.70, "bottom"), (0.90, "left")):
+            glow.setProperty("phase", phase)
+            _pump(app, 8)
+            filename = f"{prefix}-{tag}.png"
+            image = root.grabWindow()
+            _assert_clean_window(root, image, filename)
+            path = OUT_DIR / filename
+            assert image.save(str(path)), f"failed to save {path}"
+            print(f"saved {path}")
+
+    capture_neon_frames("paper", "visual-v0-rework-neon")
+
     engine.deleteLater()
     return 0
 

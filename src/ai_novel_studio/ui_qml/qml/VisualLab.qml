@@ -43,6 +43,9 @@ ApplicationWindow {
     property bool debugBackdrop: false
     property bool debugSourceRect: false
     property bool debugBlurRegion: false
+    // Neon flow demo state (user direction §24): idle | thinking | generating
+    // | success | error | cancelled | reduced.
+    property string neonDemoMode: "thinking"
     // Lightweight FPS estimate (diagnosis doc §10: show FPS / render backend).
     property int frameCount: 0
     property int lastFrameCount: 0
@@ -452,68 +455,84 @@ ApplicationWindow {
                         }
                     }
 
-                    // AI state glow showcase: thinking / cancelled / error each
-                    // carry the colored border plus a bright whitened comet
-                    // traveling along the border (user request, §22).
-                    RowLayout {
+                    // Neon flow showcase (user direction §24): one 320x160
+                    // rounded card whose border carries an energy point with a
+                    // fading tail + soft halo traveling the full perimeter.
+                    // Only ONE state is active at a time (并发上限 1-2).
+                    ColumnLayout {
                         Layout.fillWidth: true
-                        spacing: 6
+                        spacing: 8
 
-                        Repeater {
-                            model: [
-                                { key: "thinking", label: "思考中", state: "" },
-                                { key: "cancelled", label: "已取消", state: "cancelled" },
-                                { key: "error", label: "出错", state: "error" }
-                            ]
-                            delegate: Item {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 34
+                        Item {
+                            Layout.preferredWidth: 320
+                            Layout.preferredHeight: 160
+                            Layout.alignment: Qt.AlignHCenter
 
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: Theme.tokens.radius.r8
-                                    color: Theme.tokens.color.bgSurface
-                                    border.color: Theme.tokens.color.border
-                                    border.width: 1
+                            Rectangle {
+                                objectName: "neonDemoCard"
+                                anchors.fill: parent
+                                radius: Theme.tokens.radius.r16
+                                color: Theme.tokens.color.bgSurface
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: modelData.label
-                                        font.pixelSize: 10
-                                        color: Theme.tokens.color.textPrimary
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: {
+                                        var labels = {
+                                            "idle": "idle · 静态边框",
+                                            "thinking": "thinking · 循环流光",
+                                            "generating": "generating · 循环流光",
+                                            "success": "success · 单次扫过",
+                                            "error": "error · 单次扫过",
+                                            "cancelled": "cancelled · 淡出",
+                                            "reduced": "reduceMotion · 静态高亮"
+                                        }
+                                        return labels[root.neonDemoMode] || root.neonDemoMode
                                     }
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                    color: Theme.tokens.color.textPrimary
                                 }
-                                StreamingGlowBorder {
-                                    objectName: "labStateGlow-" + modelData.key
-                                    anchors.fill: parent
-                                    radius: Theme.tokens.radius.r8
-                                    active: true
-                                    state: modelData.state
+                            }
+                            StreamingGlowBorder {
+                                id: neonDemoGlow
+                                objectName: "labNeonDemoGlow"
+                                anchors.fill: parent
+                                radius: Theme.tokens.radius.r16
+                                active: root.neonDemoMode !== "idle"
+                                state: root.neonDemoMode === "reduced"
+                                    ? "idle"
+                                    : root.neonDemoMode
+                            }
+                        }
+
+                        Flow {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            Repeater {
+                                model: [
+                                    "idle", "thinking", "generating",
+                                    "success", "error", "cancelled", "reduced"
+                                ]
+                                delegate: AppButton {
+                                    objectName: "labNeonMode-" + modelData
+                                    text: modelData
+                                    ghost: true
+                                    selected: root.neonDemoMode === modelData
+                                    onClicked: root.neonDemoMode = modelData
                                 }
                             }
                         }
                     }
 
-                    // Active diff card with streaming glow (inside the panel).
-                    Item {
+                    // Diff card keeps a plain static border in the lab so the
+                    // neon demo is the only flowing instance.
+                    TextDiffCard {
+                        objectName: "labDiffCard"
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 104
-
-                        TextDiffCard {
-                            objectName: "labDiffCard"
-                            anchors.fill: parent
-                            label: "修改对比 · 第三段"
-                            currentText: "渡轮靠岸时，甲板上的水汽把远处灯塔的光晕揉成一团模糊的暖色。"
-                            draftText: "渡轮靠岸时，咸湿的水汽在甲板上流动，把远处灯塔的光晕揉成一团暖色。"
-                            state: "PENDING"
-                        }
-                        StreamingGlowBorder {
-                            id: streamingGlow
-                            objectName: "labStreamingGlow"
-                            anchors.fill: parent
-                            radius: Theme.tokens.radius.r12
-                            active: true
-                        }
+                        label: "修改对比 · 第三段"
+                        currentText: "渡轮靠岸时，甲板上的水汽把远处灯塔的光晕揉成一团模糊的暖色。"
+                        draftText: "渡轮靠岸时，咸湿的水汽在甲板上流动，把远处灯塔的光晕揉成一团暖色。"
+                        state: "PENDING"
                     }
 
                     ChangeSetCard {
