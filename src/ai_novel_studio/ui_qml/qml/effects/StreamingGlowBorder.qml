@@ -5,12 +5,13 @@ import QtQuick
 // instances at most; success/error/cancelled snap to their static state color.
 // reduceMotion degrades to a static highlight (no movement, no flicker).
 //
-// Comet highlight (user request, glassmorphism-ui-log.md §22): a brighter,
-// whitened point travels along the border at constant speed, one lap per
-// ~2.2s, for thinking/cancelled/error states. The core is near-white and the
-// halo blends the state color so it reads as light running around the edge.
-// reduceMotion keeps a single static highlight at the top edge (gentler, not
-// zero — apple-design §14).
+// "Carriage" highlight (user clarification, glassmorphism-ui-log.md ?23):
+// the state border is the track and a short capsule travels along it like a
+// train car seen from above - its width is slightly wider than the 1.5px
+// border, both ends taper back to the track (rounded capsule ends), and the
+// shape breathes subtly (length/width/opacity micro-pulse) while moving.
+// The capsule keeps the state color (slightly brightened), never whitened.
+// reduceMotion freezes both the lap and the pulse (gentler, not zero).
 Item {
     id: root
 
@@ -33,24 +34,46 @@ Item {
     readonly property color frameColor: frame.border.color
     // Test/behavior hook: whether the comet lap animation is live.
     readonly property bool cometAnimRunning: cometAnim.running
-    // Test/behavior hook: whether the comet should travel (visible + active +
-    // motion allowed).
+    // Test/behavior hook: whether the capsule should travel (visible + active
+    // + motion allowed).
     readonly property bool cometRunning:
         root.active && !root.reduce && root.visible
 
-    // Comet progress 0..1 (one full lap around the rounded-rect border).
-    // Exposed so tests can assert the path function and screenshots can park
-    // the comet at a known position.
+    // Carriage progress 0..1 (one full lap around the rounded-rect border)
+    // and pulse phase 0..1 (one breathing cycle). Exposed so tests can assert
+    // the path/angle functions and park the carriage at known positions.
     property real cometProgress: 0.0
-    property real cometCoreRadius: 2.2
-    property real cometHaloRadius: 7
+    property real pulsePhase: 0.0
     property int cometDuration: 2200
-    // Test hook: how many times the comet canvas repainted.
-    // Comet visual position (card-local), driven by property bindings so the
-    // render pipeline repaints on every progress change without a manual
+    property int pulseDuration: 1500
+    // Carriage dimensions: length along the track (~26px), breadth slightly
+    // wider than the 1.5px border (3.5px -> ~1px overhang each side).
+    property real carriageLength: 26
+    property real carriageBreadth: 3.5
+    // Breathing amplitude: breadth +-10%, length +-6%, opacity 0.85..1.0.
+    property real pulseBreadthAmplitude: 0.10
+    property real pulseLengthAmplitude: 0.06
+    // Carriage visual geometry (card-local), driven by property bindings so
+    // the render pipeline repaints on every progress change without a manual
     // requestPaint (which does not follow animations on software rendering).
     readonly property real cometVisualX: root.cometPosition(root.cometProgress).x
     readonly property real cometVisualY: root.cometPosition(root.cometProgress).y
+    readonly property real cometVisualAngle: root.pathAngle(root.cometProgress)
+    readonly property real cometVisualLength:
+        root.carriageLength
+        * (1 + root.pulseLengthAmplitude
+            * Math.sin(root.pulsePhase * 2 * Math.PI + 0.5))
+    readonly property real cometVisualBreadth:
+        root.carriageBreadth
+        * (1 + root.pulseBreadthAmplitude
+            * Math.sin(root.pulsePhase * 2 * Math.PI))
+    readonly property real cometVisualOpacity:
+        0.85 + 0.15 * Math.sin(root.pulsePhase * 2 * Math.PI + 1.2)
+    // Test/behavior hook: the carriage fill color (state color, slightly
+    // brightened, never whitened).
+    readonly property color cometColor:
+        Qt.lighter(root.staticColor, 1.18)
+    readonly property bool pulseAnimRunning: pulseAnim.running
 
     // Path sampling: split the rounded-rect perimeter into segments and walk
     // them; returns the point at `progress` (0..1) on the border centerline.
@@ -123,6 +146,53 @@ Item {
         )
     }
 
+    // Tangent angle (degrees, clockwise) at `progress` so the capsule stays
+    // aligned with the track: straight edges are fixed (top 0, right 90,
+    // bottom 180, left 270) and corner arcs rotate linearly between them.
+    function pathAngle(t) {
+        const w = root.width
+        const h = root.height
+        const r = Math.min(root.radius, w / 2, h / 2)
+        const straight = Math.max(0, w - 2 * r)
+        const vertical = Math.max(0, h - 2 * r)
+        const arc = (Math.PI / 2) * r
+        const segs = [
+            straight, arc, vertical, arc,
+            straight, arc, vertical, arc
+        ]
+        const perimeter = segs[0] + segs[1] + segs[2] + segs[3]
+            + segs[4] + segs[5] + segs[6] + segs[7]
+        let remaining = (t * perimeter) % perimeter
+        let index = 0
+        while (index < 8 && remaining > segs[index]) {
+            remaining -= segs[index]
+            index += 1
+        }
+        const frac = segs[index] > 0 ? remaining / segs[index] : 0
+        if (index === 0) {
+            return 0
+        }
+        if (index === 1) {
+            return 90 * frac
+        }
+        if (index === 2) {
+            return 90
+        }
+        if (index === 3) {
+            return 90 + 90 * frac
+        }
+        if (index === 4) {
+            return 180
+        }
+        if (index === 5) {
+            return 180 + 90 * frac
+        }
+        if (index === 6) {
+            return 270
+        }
+        return 270 + 90 * frac
+    }
+
     Rectangle {
         id: frame
         anchors.fill: parent
@@ -170,51 +240,42 @@ Item {
         }
     }
 
-    // The comet: a bright whitened point traveling along the border. Built
-    // from three concentric circles (halo / mid / white core) and moved via a
-    // transform.translate driven by bindings — the render pipeline repaints
-    // automatically (a Canvas requestPaint does not follow animations on
-    // software rendering), no layout property animates and the loop is
-    // constant-speed (linear).
+    // The carriage: a short capsule traveling along the border like a train
+    // car on its track - length along the tangent, breadth a bit wider than
+    // the border, rounded ends tapering back to the track, state-colored
+    // (slightly brightened, never whitened) and breathing subtly. Driven by
+    // bindings on x/y/rotation/width/height/opacity so the render pipeline
+    // repaints automatically (Canvas requestPaint does not follow animations
+    // on software rendering); no layout property animates.
     Item {
         id: cometVisual
         objectName: "streamingComet"
-        width: root.cometHaloRadius * 2
-        height: root.cometHaloRadius * 2
         visible: root.active
+        x: root.cometVisualX - cometVisual.width / 2
+        y: root.cometVisualY - cometVisual.height / 2
+        width: root.cometVisualLength
+        height: root.cometVisualBreadth
+        rotation: root.cometVisualAngle
+        opacity: root.cometVisualOpacity
 
-        transform: Translate {
-            id: cometTranslate
-            x: root.cometVisualX - cometVisual.width / 2
-            y: root.cometVisualY - cometVisual.height / 2
-        }
-
-        // Outer halo: state color at low alpha.
+        // Soft outer glow capsule: state color, wider than the track so the
+        // carriage reads as slightly overhanging the rails.
         Rectangle {
             anchors.fill: parent
-            radius: width / 2
+            radius: height / 2
             color: Qt.rgba(
-                root.staticColor.r,
-                root.staticColor.g,
-                root.staticColor.b,
-                0.40
+                root.cometColor.r,
+                root.cometColor.g,
+                root.cometColor.b,
+                0.30
             )
+            scale: 1.55
         }
-        // Mid glow: whitened state color, brighter toward the core.
+        // Solid carriage body: rounded ends taper back to the track.
         Rectangle {
-            anchors.centerIn: parent
-            width: root.cometHaloRadius * 1.15
-            height: root.cometHaloRadius * 1.15
-            radius: width / 2
-            color: Qt.rgba(1, 1, 1, 0.55)
-        }
-        // Bright near-white core: the 泛白 point of the highlight.
-        Rectangle {
-            anchors.centerIn: parent
-            width: root.cometCoreRadius * 2
-            height: root.cometCoreRadius * 2
-            radius: width / 2
-            color: "white"
+            anchors.fill: parent
+            radius: height / 2
+            color: root.cometColor
         }
     }
 
@@ -228,5 +289,19 @@ Item {
         loops: Animation.Infinite
         running: root.cometRunning
         easing.type: Easing.Linear
+    }
+
+    // Shape breathing: a separate, slower cycle that slightly changes the
+    // carriage length/breadth/opacity while it travels (???????).
+    NumberAnimation {
+        id: pulseAnim
+        target: root
+        property: "pulsePhase"
+        from: 0
+        to: 1
+        duration: root.pulseDuration
+        loops: Animation.Infinite
+        running: root.cometRunning
+        easing.type: Easing.InOutSine
     }
 }

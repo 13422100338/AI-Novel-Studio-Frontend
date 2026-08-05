@@ -841,6 +841,88 @@ def test_comet_path_follows_rounded_rect_border(qtbot: QtBot) -> None:
     assert abs(p0[0] - p1[0]) < 0.01 and abs(p0[1] - p1[1]) < 0.01
 
 
+def test_carriage_shape_tangent_and_color(qtbot: QtBot) -> None:
+    """The traveling highlight is a state-colored capsule, not a whitened dot:
+    it is elongated along the track, slightly wider than the border, rotates
+    with the tangent, and never goes white."""
+    engine, facade, _, window = _load_lab(qtbot)
+    qtbot.wait(250)
+    glow = _find_item(_content(window), "labStateGlow-thinking")
+    assert glow is not None
+    facade.setReduceMotion(True)  # freeze lap/pulse for deterministic asserts
+    qtbot.wait(20)
+
+    def value(expression_text: str) -> float:
+        expression = QQmlExpression(engine.rootContext(), glow, expression_text)
+        result = expression.evaluate()
+        assert result is not None and result[0] is not None, (
+            f"{expression_text} failed: {result}"
+        )
+        return float(result[0])
+
+    # Capsule proportions: length >> breadth, breadth slightly wider than the
+    # 1.5px border but small enough to stay a slim carriage.
+    length = value("cometVisualLength")
+    breadth = value("cometVisualBreadth")
+    assert length > breadth * 3, (length, breadth)
+    assert breadth > float(glow.property("glowWidth")), breadth
+    assert breadth < 8, breadth
+
+    # Color: state family (thinkingA purple-ish), never near-white.
+    color = QColor(str(glow.property("cometColor")))
+    assert color.red() + color.green() + color.blue() < 640, color.name()
+    assert color.name() != "#ffffff"
+
+    # Breathing: advancing the pulse phase changes the capsule dimensions
+    # (the 微小形状变化 the user asked for).
+    glow.setProperty("pulsePhase", 0.0)
+    qtbot.wait(10)
+    base_length = value("cometVisualLength")
+    base_breadth = value("cometVisualBreadth")
+    glow.setProperty("pulsePhase", 0.25)  # sin peak for breadth, off-zero for length
+    qtbot.wait(10)
+    assert abs(value("cometVisualLength") - base_length) > 0.5
+    assert abs(value("cometVisualBreadth") - base_breadth) > 0.1
+
+    # Tangent angle follows the border monotonically (straight edges hold a
+    # cardinal direction, corner arcs interpolate linearly between them), so
+    # the raw angle climbs 0 -> 90 -> 180 -> 270 -> ~360 and wraps to 0 at
+    # the lap seam (the single allowed reverse jump).
+    previous = -1.0
+    wrapped = False
+    crossed: set[int] = set()
+    for step in range(201):
+        angle = value(f"pathAngle({step / 200})")
+        wrap = previous > 300 and angle < 30
+        wrapped = wrapped or wrap
+        assert angle >= previous - 0.01 or wrap, (
+            f"angle reversed at {step / 200}: {previous} -> {angle}"
+        )
+        previous = angle
+        for boundary in (90, 180, 270):
+            if angle >= boundary - 1.0:
+                crossed.add(boundary)
+    # 0 -> 90 -> 180 -> 270, then wraps to 0 at the lap seam (t=1 returns 0,
+    # never 360, so the wrap itself is the fourth boundary check).
+    assert crossed == {90, 180, 270}, crossed
+    assert wrapped, "lap seam wrap missing"
+
+
+def test_carriage_breathing_stops_with_reduce_motion(qtbot: QtBot) -> None:
+    """The subtle shape pulse runs with the lap and freezes under
+    reduceMotion (gentler, not zero: the capsule stays, only motion stops)."""
+    _, facade, _, window = _load_lab(qtbot)
+    glow = _find_item(_content(window), "labStateGlow-thinking")
+    assert glow is not None
+
+    assert bool(glow.property("cometRunning")) is True
+    assert bool(glow.property("pulseAnimRunning")) is True
+
+    facade.setReduceMotion(True)
+    qtbot.waitUntil(lambda: bool(glow.property("cometRunning")) is False)
+    assert bool(glow.property("pulseAnimRunning")) is False
+
+
 def test_visual_quality_cycles_safe_balanced_premium(qtbot: QtBot) -> None:
     _, _, theme, _ = _load_lab(qtbot)
 
