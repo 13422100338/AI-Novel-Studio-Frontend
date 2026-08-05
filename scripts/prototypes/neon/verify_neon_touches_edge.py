@@ -103,9 +103,32 @@ def main() -> int:
     )
     logical = dist / dpr
     print(f"edge distance: {dist:.1f} device px = {logical:.2f} logical px")
-    print("PASS" if logical <= 3.0 else "FAIL", "- light should sit on the edge")
+
+    # Halo visibility: sample the band outside the card (0..12 logical px)
+    # and count pixels tinted by the neon color (blue-purple family) instead
+    # of the plain background. The halo must be visible outside the edge.
+    band = 12 * dpr
+    halo_px = 0
+    for y in range(int(card_y - band), int(card_y + card_h + band)):
+        for x in range(int(card_x - band), int(card_x + card_w + band)):
+            inside = (
+                card_x <= x < card_x + card_w
+                and card_y <= y < card_y + card_h
+            )
+            if inside:
+                continue
+            r, g, b = shot.getpixel((x, y))
+            if b > 60 and b > r + 8:
+                halo_px += 1
+    print(f"halo pixels outside the card edge: {halo_px}")
+
+    ok_edge = logical <= 3.0
+    ok_halo = halo_px >= 200
+    print("PASS" if ok_edge and ok_halo else "FAIL",
+          f"- edge {'ok' if ok_edge else 'BAD'}, "
+          f"halo {'ok' if ok_halo else 'NOT VISIBLE'}")
     engine.deleteLater()
-    return 0 if logical <= 3.0 else 1
+    return 0 if ok_edge and ok_halo else 1
 
 
 if __name__ == "__main__":

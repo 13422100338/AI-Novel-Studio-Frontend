@@ -134,3 +134,25 @@ half-extent 传成了 `hb - r`，导致整个轮廓比卡片边缘内缩 2×圆�
 验证：`scripts/prototypes/neon/verify_neon_touches_edge.py` 在真实 App
 中测量光点核心到卡片边缘的距离——修复前内缩约 24 逻辑 px，修复后
 `0.00 logical px`，完全贴边。正式与原型 frag/qsb 同步更新。
+
+### 辉光外溢修复（2026-08-05）
+
+贴边后用户反馈辉光看不见。两个根因：
+
+1. ShaderEffect 矩形恰好等于卡片大小，halo 的外半部分全部溢出到矩形外
+   被裁剪，只剩内侧一点；
+2. frag 最后 `col *= borderMask; alpha *= borderMask` 把 halo 也乘上了
+   边框带 mask——halo 被约束在 1.5px 的边框带内，本质上不可见。
+
+修复：
+
+- ShaderEffect 用 `anchors.margins: -haloOutset` 向外扩出
+  `max(haloRadius, 8)`，辉光可以溢出卡片边缘；
+- frag 新增 `uOutset` uniform，像素坐标从扩大的矩形映射回卡片坐标系：
+  `p = qt_TexCoord0 * (uSize + 2*uOutset) - uOutset`；
+- core/tail 仍乘 borderMask 紧贴边框中心线；halo 只由 SDF 控制、不再乘
+  borderMask，强度略提升（col 0.24 / alpha 0.18）。
+
+验证：`verify_neon_touches_edge.py` 同时断言光点贴边（0.00 逻辑 px）与
+辉光溢出（卡片外 12 逻辑 px 带内 9486 个霓虹像素）。正式与原型
+frag/vert/qsb 同步更新；188 个 UI 测试通过。

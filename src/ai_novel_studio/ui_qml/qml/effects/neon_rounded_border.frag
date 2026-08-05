@@ -15,6 +15,7 @@ layout(std140, binding = 0) uniform buf {
     float uTailLength;
     float uHaloRadius;
     float uDpr;
+    float uOutset;
 };
 
 const float PI = 3.14159265358979323846;
@@ -137,8 +138,10 @@ vec2 perimeterCoord(vec2 p, vec2 hb, float r, float perimeter) {
 }
 
 void main() {
-    // Pixel in logical coordinates.
-    vec2 p = qt_TexCoord0 * uSize;
+    // Pixel in card logical coordinates. The ShaderEffect is expanded by
+    // uOutset on every side so the halo can spill outside the card edge
+    // instead of being clipped at the card rectangle.
+    vec2 p = qt_TexCoord0 * (uSize + 2.0 * uOutset) - uOutset;
     vec2 hb = uSize * 0.5;
     float r = min(uRadius, min(hb.x, hb.y));
     float sdf = sdRoundRect(p - hb, hb, r);
@@ -168,16 +171,15 @@ void main() {
     float tail = pxDist < 0.0
         ? exp((pxDist) / max(uTailLength, 1.0))
         : 0.0;
-    // Halo: low-alpha glow around the border band.
+    // Halo: low-alpha glow around the border edge, driven by the SDF so it
+    // spills outside the card (never clipped by the border band mask).
     float halo = exp(-(sdf * sdf) / (uHaloRadius * uHaloRadius));
 
-    vec3 col = uColor.rgb * (core + tail * 0.85);
-    float alpha = core + tail * 0.65;
-    col += uColor.rgb * halo * 0.18;
-    alpha += halo * 0.14;
-
-    col *= borderMask;
-    alpha *= borderMask;
+    // The light point and tail hug the border centerline; the halo glows
+    // around the whole edge and is NOT multiplied by borderMask (that would
+    // confine it to the thin border band and make it invisible).
+    vec3 col = uColor.rgb * ((core + tail * 0.85) * borderMask + halo * 0.24);
+    float alpha = (core + tail * 0.65) * borderMask + halo * 0.18;
 
     fragColor = vec4(col, alpha) * qt_Opacity;
 }

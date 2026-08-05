@@ -123,10 +123,17 @@ Item {
         border.color: root.stateColor
     }
 
+    // The effect layer expands beyond the card by the halo radius so the
+    // glow can spill outside the edge. It never participates in layout and
+    // ShaderEffect does not receive mouse events, so neighbors stay
+    // interactive.
+    readonly property real haloOutset: Math.max(root.haloRadius, 8)
+
     ShaderEffect {
         id: effect
         objectName: "neonShaderEffect"
         anchors.fill: parent
+        anchors.margins: -root.haloOutset
         visible: root.neonActive
         opacity: root.cancelFaded ? 0 : 1
 
@@ -140,6 +147,7 @@ Item {
         property real uHaloRadius: root.haloRadius
         property real uDpr: typeof root.window !== "undefined"
             && root.window !== null ? root.window.devicePixelRatio : 1.0
+        property real uOutset: root.haloOutset
 
         fragmentShader: Qt.resolvedUrl("neon_rounded_border.qsb")
 

@@ -16,6 +16,7 @@ layout(std140, binding = 0) uniform buf {
     float uTailLength;
     float uHaloRadius;
     float uDpr;
+    float uOutset;
 };
 
 void main() {
