@@ -116,7 +116,9 @@ Item {
                     } else if (kind === "run_status") {
                         loadedItem.label = label
                         loadedItem.busy = busy
-                        loadedItem.status = status
+                        // `status` alone resolves to Loader.status (Ready=1),
+                        // not the timeline model role; use the model object.
+                        loadedItem.status = model.status
                     } else if (kind === "tool_call" || kind === "tool_result") {
                         loadedItem.label = label
                         loadedItem.text = text

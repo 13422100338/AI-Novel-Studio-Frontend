@@ -387,3 +387,40 @@ def test_multi_turn_no_overlap_autoscroll_and_old_buttons(qtbot: QtBot) -> None:
     model = facade.property("agentTimeline")
     states = {item.id: item.state for item in model.items()}
     assert states.get(item_id) == "APPLIED"
+
+
+def test_run_status_card_carries_neon_border_states(qtbot: QtBot) -> None:
+    """The production run_status card is wired to the shader neon border:
+    busy -> thinking loop, DONE -> success single sweep, idle otherwise
+    (prototype B production integration)."""
+    facade = MockNovelStudioFacade()
+    _seed_item(facade, "run_status", label="正在读取当前章节", busy=True, status="RUNNING")
+    _, content, _, _ = _load_panel(qtbot, facade, width=420)
+
+    qtbot.waitUntil(
+        lambda: bool(_find_all(content, "agentRunStatusNeon")),
+        timeout=5000,
+    )
+    status_card = _find_all(content, "agentRunStatus")[0]
+    neon = _find_all(content, "agentRunStatusNeon")[0]
+    assert neon is not None
+    assert neon.property("active") is True
+    assert neon.property("state") == "thinking"
+    assert bool(neon.property("loopAnimRunning")) is True
+
+    # Transition to DONE: one success sweep, then it stops.
+    neon.setProperty("flowDuration", 60)
+    status_card.setProperty("busy", False)
+    status_card.setProperty("status", "DONE")
+    qtbot.waitUntil(lambda: neon.property("state") == "success", timeout=5000)
+    qtbot.waitUntil(
+        lambda: bool(neon.property("singleFinished")) is True,
+        timeout=2000,
+    )
+    assert bool(neon.property("animationRunning")) is False
+
+    # Back to an idle state: static border, no flow.
+    status_card.setProperty("status", "")
+    qtbot.waitUntil(lambda: neon.property("state") == "idle", timeout=5000)
+    assert neon.property("active") is False
+    assert bool(neon.property("loopAnimRunning")) is False

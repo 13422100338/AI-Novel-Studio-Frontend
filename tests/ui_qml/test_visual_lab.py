@@ -758,34 +758,50 @@ def test_neon_demo_defaults_to_thinking_loop(qtbot: QtBot) -> None:
 
 
 def test_neon_shader_core_tail_halo_and_no_capsule(qtbot: QtBot) -> None:
-    """Source contract: the effect is one ShaderEffect painting a core, a
-    fading tail and a low-alpha halo along the full perimeter; no capsule /
-    carriage remnants are allowed (user direction ?24)."""
-    source = (
+    """Source contract: the production effect is one ShaderEffect painting a
+    core, a fading tail and a low-alpha halo along the full perimeter from a
+    continuous perimeter function; no Canvas sprite, no capsule / carriage
+    remnants (prototype B acceptance, user direction 25)."""
+    effects_dir = (
         Path(__file__).resolve().parent.parent.parent
         / "src"
         / "ai_novel_studio"
         / "ui_qml"
         / "qml"
         / "effects"
-        / "StreamingGlowBorder.qml"
-    ).read_text(encoding="utf-8")
-    # One overlay paints core + tail + halo; the perimeter parameterization
-    # covers all four edges and corner arcs (user direction §24).
-    assert "Canvas" in source
-    assert "onPaint" in source
-    assert "pathPoint" in source and "pathAngle" in source
-    assert "coreRadius" in source
-    assert "tailLength" in source and "tailSamples" in source
-    assert "haloRadius" in source
-    assert "function pathPoint" in source              # full perimeter
-    assert "function pathAngle" in source              # tangent direction
-    # Rejected design must not silently return.
-    assert "carriageLength" not in source
-    assert "cometVisualLength" not in source
-    assert "pulsePhase" not in source
-    assert "streamingComet" not in source
+    )
+    wrapper = (effects_dir / "StreamingGlowBorder.qml").read_text(encoding="utf-8")
+    effect = (effects_dir / "NeonRoundedBorderEffect.qml").read_text(
+        encoding="utf-8"
+    )
+    frag = (effects_dir / "neon_rounded_border.frag").read_text(encoding="utf-8")
 
+    # The compatibility wrapper delegates to the shader component and keeps
+    # the old public API (tailSamples stays for consumers/tests).
+    assert "NeonRoundedBorderEffect" in wrapper
+    assert "tailSamples" in wrapper
+    assert "coreRadius" in effect and "tailLength" in effect
+    assert "haloRadius" in effect and "glowWidth" in effect
+
+    # One ShaderEffect + precompiled qsb; no Canvas light sprite.
+    assert "ShaderEffect" in effect
+    assert "neon_rounded_border.qsb" in effect
+    assert "Canvas {" not in effect
+    assert "onPaint" not in effect
+    assert "pathPoint" not in effect and "pathAngle" not in effect
+
+    # The fragment shader computes the full continuous perimeter: SDF,
+    # perimeter coordinate, ring distance, core/tail/halo.
+    assert "sdRoundRect" in frag
+    assert "perimeterCoord" in frag
+    assert "uPhase" in frag
+    assert "core" in frag and "tail" in frag and "halo" in frag
+
+    # Rejected designs must not silently return.
+    assert "carriageLength" not in wrapper
+    assert "cometVisualLength" not in wrapper
+    assert "pulsePhase" not in wrapper
+    assert "streamingComet" not in wrapper
 
 def test_neon_state_machine_modes(qtbot: QtBot) -> None:
     """idle static; thinking/generating loop; success/error single sweep;

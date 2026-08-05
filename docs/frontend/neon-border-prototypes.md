@@ -93,3 +93,33 @@ DPR 100/125/150%：shader 全部使用逻辑坐标（`qt_TexCoord0 * uSize`）�
   UI 修改）。
 - Qt Quick Effect Maker 离线版本机未找到；如需 `.qep` 源文件，需在安装
   QQEM 后从 `.frag/.vert` 导入生成。
+
+## 正式接入（用户验收 B 后）
+
+2026-08-05 用户确认原型 B 满意后接入正式 UI：
+
+- `src/ai_novel_studio/ui_qml/qml/effects/NeonRoundedBorderEffect.qml`：
+  正式 shader 组件（从原型 B 落位），保留逐像素 SDF + 连续周长坐标 +
+  UniformAnimator 渲染线程驱动，并补齐正式契约：状态颜色映射
+  （thinkingA/generatingA/success/error/cancelled）、cancelled 淡出、
+  Safe tier 静态回退、窗口隐藏暂停、`shaderStatus/shaderLog/shaderReady`
+  失败检测。
+- `StreamingGlowBorder.qml`：重写为兼容层，委托 NeonRoundedBorderEffect，
+  保留原公开 API（active/state/radius/glowWidth/coreRadius/tailLength/
+  haloRadius/tailSamples/flowDuration/fadeDuration）与测试 hooks
+  （animationRunning/loopAnimRunning/fadeAnimRunning/frameColor/
+  singleFinished/cancelFaded/phase/paintCount），旧 Canvas 实现移除。
+- `AgentRunStatus.qml`：正式 run_status 卡片接入 neon 边框——busy →
+  thinking 循环，status DONE → success 单次，其他 → idle 静态边框。
+- 顺带修复既有 bug：`CreativeAgentPanel` 中 `loadedItem.status = status`
+  的 `status` 解析到 Loader 内置属性（Ready=1）而非模型 role，改为
+  `model.status` 后 run_status 的 status 文本才显示 RUNNING/DONE。
+- 测试：`test_visual_lab.py` 的源码契约测试改为 shader 契约
+  （ShaderEffect + qsb + frag 含 sdRoundRect/perimeterCoord/uPhase，
+  无 Canvas/onPaint/pathPoint/pathAngle）；新增
+  `test_run_status_card_carries_neon_border_states` 验证
+  busy→thinking / DONE→success / idle 三态。
+- 交付证据：`docs/frontend/screenshots/c1-neon-thinking.png`（蓝色霓虹
+  光点运行中）、`c1-neon-success.png`（success 静态边框）；冒烟脚本
+  `scripts/prototypes/neon/smoke_production_integration.py` 在真实 App
+  中跑通 thinking 循环与 success 扫过。
