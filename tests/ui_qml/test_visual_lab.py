@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import QMetaObject, QObject, QUrl, Slot
 from PySide6.QtGui import QColor
-from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtQml import QQmlApplicationEngine, QQmlExpression
 from PySide6.QtQuick import QQuickItem, QQuickWindow
 from pytestqt.qtbot import QtBot
 
@@ -747,9 +747,98 @@ def test_streaming_glow_degrades_with_reduce_motion(qtbot: QtBot) -> None:
     assert glow is not None
 
     assert glow.property("animationRunning") is True
+    assert bool(glow.property("cometRunning")) is True
+    assert bool(glow.property("cometAnimRunning")) is True
     facade.setReduceMotion(True)
     qtbot.waitUntil(lambda: glow.property("animationRunning") is False)
     assert glow.property("frameColor") == "#7C6FD8"  # static thinkingA
+    assert bool(glow.property("cometRunning")) is False
+    assert bool(glow.property("cometAnimRunning")) is False
+
+
+def test_state_glow_showcase_runs_comet_on_all_states(qtbot: QtBot) -> None:
+    """thinking / cancelled / error state cards each show the colored border
+    and the traveling bright comet (user request: all three states)."""
+    _, _, _, window = _load_lab(qtbot)
+    content = _content(window)
+    for key in ("thinking", "cancelled", "error"):
+        glow = _find_item(content, "labStateGlow-" + key)
+        assert glow is not None, f"missing labStateGlow-{key}"
+        comet = _find_item(glow, "streamingComet")
+        assert comet is not None, f"{key}: comet layer missing"
+        assert glow.property("active") is True
+        assert bool(glow.property("cometRunning")) is True, key
+        assert bool(glow.property("cometAnimRunning")) is True, key
+        assert comet.property("visible") is True
+
+
+def test_comet_path_follows_rounded_rect_border(qtbot: QtBot) -> None:
+    """The comet position function stays on the rounded-rect border for the
+    whole lap, visits all four edges, and closes the loop."""
+    engine, _, _, window = _load_lab(qtbot)
+    qtbot.wait(250)  # offscreen layout: card geometry settles late
+    glow = _find_item(_content(window), "labStateGlow-thinking")
+    assert glow is not None
+    assert float(glow.property("width")) > 0, "card width not laid out"
+    assert float(glow.property("height")) > 0, "card height not laid out"
+
+    def coord(expression_text: str) -> float:
+        expression = QQmlExpression(engine.rootContext(), glow, expression_text)
+        value = expression.evaluate()
+        assert value is not None and value[0] is not None, (
+            f"{expression_text} failed: {value}"
+        )
+        return float(value[0])
+
+    def pos(p: float) -> tuple[float, float]:
+        return (
+            coord(f"cometPosition({p}).x"),
+            coord(f"cometPosition({p}).y"),
+        )
+
+    width = float(glow.property("width"))
+    height = float(glow.property("height"))
+    radius = float(glow.property("radius"))
+
+    edges_seen = {"top": False, "right": False, "bottom": False, "left": False}
+    previous = None
+    for step in range(51):
+        p = pos(step / 50)
+        x, y = p
+        assert -0.5 <= x <= width + 0.5, p
+        assert -0.5 <= y <= height + 0.5, p
+        # Border band = the four straight edges plus the corner arcs; the arc
+        # coordinates bend inward from the edges, so "on border" means within
+        # radius+1 of at least one side.
+        near_border = (
+            x <= radius + 1.0
+            or x >= width - radius - 1.0
+            or y <= radius + 1.0
+            or y >= height - radius - 1.0
+        )
+        assert near_border, f"off border at {step / 50}: {p}"
+        if abs(y) < 1.0 and radius < x < width - radius:
+            edges_seen["top"] = True
+        if abs(x - width) < 1.0 and radius < y < height - radius:
+            edges_seen["right"] = True
+        if abs(y - height) < 1.0 and radius < x < width - radius:
+            edges_seen["bottom"] = True
+        if abs(x) < 1.0 and radius < y < height - radius:
+            edges_seen["left"] = True
+        if previous is not None:
+            # Motion is continuous: consecutive samples never jump.
+            # A sample step is ~5px of perimeter; the corner arcs project up
+            # to ~12px of x-change per step at the tangent, so 20 is a safe
+            # continuity bound.
+            assert abs(x - previous[0]) < 20 and abs(y - previous[1]) < 20, (
+                f"jump at {step / 50}: {previous} -> {p}"
+            )
+        previous = p
+
+    assert all(edges_seen.values()), f"edges not all visited: {edges_seen}"
+    p0 = pos(0.0)
+    p1 = pos(1.0)
+    assert abs(p0[0] - p1[0]) < 0.01 and abs(p0[1] - p1[1]) < 0.01
 
 
 def test_visual_quality_cycles_safe_balanced_premium(qtbot: QtBot) -> None:

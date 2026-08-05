@@ -672,6 +672,63 @@ Qt 侧画布色，页面内部 html/body 与 ProseMirror 一直落在默认米�
   （dark 66.7 vs 41.0、light 216 vs 245、paper 221 vs 249）——玻璃边缘光与
   背景光晕生效；dark 下内部为深色（不再米色）。
 
+## 22. 追加（2026-08-05）：状态光带“泛白亮点沿边框移动”（comet）
+
+用户要求：AI 商讨模型 thinking / cancel / error 状态卡的光带（彩色边框）
+上，增加一个更亮、泛白的光点沿光带移动，凸显灵动感。本轮按要求调用
+animation-vocabulary / apple-design / emil-design-eng /
+find-animation-opportunities / improve-animations / review-animations，
+并先按 vision-bridge 尝试读用户截图（atlas-vision 与 view_image 均不可用，
+改用结构性 + 像素证据）。
+
+### 22.1 效果定位
+
+词汇表定位：沿路径匀速移动的高亮点 = **Orbit / 沿路径移动的亮点**（恒定
+速度、单一高亮元素、reduceMotion 降级）。现有 `StreamingGlowBorder` 只有
+1.5px 边框颜色渐变（thinkingA↔thinkingB，2.8s），没有亮点移动——新增
+comet 层。
+
+### 22.2 实现（StreamingGlowBorder.qml）
+
+- 三层同心圆构成亮点：外圈状态色 halo（α0.40）、中圈泛白高光（白 α0.55）、
+  内圈近白 core（直径 4.4）——“更亮泛白”由中圈+core 实现，颜色家族仍
+  跟随状态（thinking 紫 / cancelled 灰 / error 红）。
+- 位置：`pathPoint(t,w,h,r)` 把圆角矩形周长分成 4 直线 + 4 角弧，
+  `cometPosition(progress)` 返回 0..1 对应的边框中心线坐标；修掉一个真实
+  bug——角弧曾用起始角圆心导致路径在 ~0.33 处折返，改为目标角圆心后
+  闭环正确。
+- 移动：`NumberAnimation` 驱动 `cometProgress` 0→1 循环（2200ms，
+  **Linear** 恒定速度）；亮点用 `transform.translate` + 属性绑定驱动
+  （软件渲染下 Canvas requestPaint 不随动画重绘，已实测排除），不触发
+  布局、只动合成属性。
+- reduceMotion：`cometRunning` 为 false，亮点静止（gentler，不是零动效，
+  apple-design §14）；thinking/cancelled/error 三状态都跑 comet。
+- VisualLab：AI 面板新增一行三张小状态卡（思考中/已取消/出错），各挂
+  StreamingGlowBorder（active + 对应 state），lab 里三种状态都有 comet
+  演示；原有 diff 卡 glow 同样带 comet。
+
+### 22.3 验证
+
+- 新增/扩展测试：三状态卡 comet 均在运行；路径函数全程贴边框、四边全覆盖、
+  连续、闭环；reduceMotion 停止 comet。前端 pytest 182 passed / 35 skipped；
+  ruff 通过；mypy（项目配置）通过。
+- 像素证据（offscreen 抓图）：cometVisual 绑定位置随 progress 变化
+  （0.1→右边缘 (105,18)、0.5→底边、0.9→左边缘）；16×16 采样确认白色
+  core 与状态色 halo 出现在期望边框位置；两帧差分确认亮点在移动。
+
+### 22.4 review-animations 自审
+
+| Before（朴素基线） | After（本轮实现） | Why |
+| --- | --- | --- |
+| 边框只有颜色渐变 | 颜色渐变 + 白亮 comet 沿边框匀速绕行 | 状态指示更“活”（orbit，恒定速度） |
+| 无 reduceMotion 分支 | cometRunning 关闭、亮点静止 | 动效降级但保留状态色（apple §14） |
+| Canvas requestPaint 驱动 | transform.translate + 属性绑定 | 软件渲染下 requestPaint 不随动画重绘（实测） |
+| 直线循环（若有） | 圆角矩形 4 直线 + 4 角弧分段 | 与卡片圆角一致，不切角 |
+
+**Verdict: Approve**——仅移动一个高亮元素、Linear 匀速、只动 transform、
+reduceMotion 降级、单实例成本可控（一次最多 1-2 个 live 卡）、无
+scale(0)/ease-in；路径连续性有测试锁定。
+
 ## 16. 追加（2026-08-04）：Header 玻璃化、控制条边缘统一、资源门禁
 
 “做下一波”收尾：实验页剩余大容器统一玻璃语言，并补齐资源/几何门禁测试。

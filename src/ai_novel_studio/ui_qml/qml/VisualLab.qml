@@ -452,6 +452,48 @@ ApplicationWindow {
                         }
                     }
 
+                    // AI state glow showcase: thinking / cancelled / error each
+                    // carry the colored border plus a bright whitened comet
+                    // traveling along the border (user request, §22).
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        Repeater {
+                            model: [
+                                { key: "thinking", label: "思考中", state: "" },
+                                { key: "cancelled", label: "已取消", state: "cancelled" },
+                                { key: "error", label: "出错", state: "error" }
+                            ]
+                            delegate: Item {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 34
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: Theme.tokens.radius.r8
+                                    color: Theme.tokens.color.bgSurface
+                                    border.color: Theme.tokens.color.border
+                                    border.width: 1
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData.label
+                                        font.pixelSize: 10
+                                        color: Theme.tokens.color.textPrimary
+                                    }
+                                }
+                                StreamingGlowBorder {
+                                    objectName: "labStateGlow-" + modelData.key
+                                    anchors.fill: parent
+                                    radius: Theme.tokens.radius.r8
+                                    active: true
+                                    state: modelData.state
+                                }
+                            }
+                        }
+                    }
+
                     // Active diff card with streaming glow (inside the panel).
                     Item {
                         Layout.fillWidth: true
