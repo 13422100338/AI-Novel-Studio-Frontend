@@ -123,3 +123,14 @@ DPR 100/125/150%：shader 全部使用逻辑坐标（`qt_TexCoord0 * uSize`）�
   光点运行中）、`c1-neon-success.png`（success 静态边框）；冒烟脚本
   `scripts/prototypes/neon/smoke_production_integration.py` 在真实 App
   中跑通 thinking 循环与 success 扫过。
+
+### 贴边修复（2026-08-05）
+
+用户反馈光条在卡片内部而非贴着 UI 边缘。根因：shader 把圆角矩形轮廓的
+half-extent 传成了 `hb - r`，导致整个轮廓比卡片边缘内缩 2×圆角半径
+（如 radius 12 时内缩 24px）。修复：`sdRoundRect` 与 `perimeterCoord`
+都改用真实半尺寸 `hb`，轮廓即卡片实际边缘。
+
+验证：`scripts/prototypes/neon/verify_neon_touches_edge.py` 在真实 App
+中测量光点核心到卡片边缘的距离——修复前内缩约 24 逻辑 px，修复后
+`0.00 logical px`，完全贴边。正式与原型 frag/qsb 同步更新。

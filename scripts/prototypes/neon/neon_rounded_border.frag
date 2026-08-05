@@ -141,7 +141,7 @@ void main() {
     vec2 p = qt_TexCoord0 * uSize;
     vec2 hb = uSize * 0.5;
     float r = min(uRadius, min(hb.x, hb.y));
-    float sdf = sdRoundRect(p - hb, hb - r, r);
+    float sdf = sdRoundRect(p - hb, hb, r);
 
     float w = hb.x * 2.0;
     float h = hb.y * 2.0;
@@ -150,7 +150,7 @@ void main() {
     float arc = (PI * 0.5) * r;
     float perimeter = 2.0 * straightX + 2.0 * straightY + 4.0 * arc;
 
-    vec2 pc = perimeterCoord(p - hb, hb - r, r, perimeter);
+    vec2 pc = perimeterCoord(p - hb, hb, r, perimeter);
     float t = pc.x;          // perimeter coordinate 0..1
     float borderDist = pc.y; // distance to the border centerline
 
