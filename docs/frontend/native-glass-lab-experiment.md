@@ -149,6 +149,26 @@ PySide6 6.11 + QML，因此按等价能力做了映射：
   显示原因而不是假装玻璃生效。
 - macOS / Linux 仅预留接口，本轮不做视觉验收。
 
+## 7. 正式 Shell 整合（2026-08-06）
+
+实验结论固化后整合进生产前端（`App.qml` + `bootstrap.py`）：
+
+- **默认启用**：`python -m ai_novel_studio.ui_qml` 在 Windows 11 22621+ 且
+  “透明效果”开启时，自动给主窗口挂 DWM Desktop Acrylic；`--no-glass` 可
+  强制回退旧的不透明 Shell。
+- **无边框 + 自绘标题栏**：原生材质要求 `FramelessWindowHint`，因此玻璃
+  模式下显示自绘标题栏（拖拽/最小化/最大化/关闭）和系统 resize 边缘
+  （`startSystemMove` / `startSystemResize`）。
+- **wash 层**：`windowWash`（bgCanvas alpha 0.15）保证可读性，同时保留
+  材质透出（与 Lab 同值）。
+- **失败回退**：桥 `nativeActive == false` 时窗口保持不透明主题画布，
+  标题栏与 resize 边缘仅在 `UseNativeGlass` 为真时出现。
+- **测试**：`tests/ui_qml/test_native_glass_shell.py`（5 个）覆盖
+  默认不透明、桥未激活回退、激活透明、主题暗色同步、重试计数。
+- **证据**：`scripts/capture_glass_shell.py --windowed` 输出
+  `glass-shell-*-screen.png`（真实屏幕合成，标题栏背景条统计：
+  acrylic std≈55 vs solid std≈12，壁纸纹理确实被模糊进背景）。
+
 ## 6. 回滚方式
 
 1. 删除 `NativeGlassLab.qml`；

@@ -231,6 +231,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = [arg for arg in args if arg != "--visual-lab"]
     native_glass_lab = "--native-glass-lab" in args
     args = [arg for arg in args if arg != "--native-glass-lab"]
+    use_native_glass = "--no-glass" not in args
+    args = [arg for arg in args if arg != "--no-glass"]
     if use_webengine and not visual_lab and not native_glass_lab:
         # QtWebEngine's GPU compositor on Windows can lose its D3D context
         # during layout-driven resizes (AI dock open/close), leaving a black
@@ -299,6 +301,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return app.exec()
     engine.rootContext().setContextProperty("WritingPageUseWebEngine", use_webengine)
+    # Production-shell system backdrop: default on when the machine supports
+    # it (Windows 11 22621+, "Transparency effects" enabled). The window gets
+    # a DWM Desktop Acrylic material; QML keeps an opaque fallback whenever
+    # the bridge reports nativeActive == false. Pass --no-glass to force the
+    # previous fully opaque shell.
+    glass_available = False
+    if use_native_glass:
+        from ai_novel_studio.ui_qml.bridge.windows_backdrop import (
+            effective_backdrop_kind,
+        )
+
+        glass_available = effective_backdrop_kind("acrylic") != "none"
+    if glass_available:
+        # Alpha swapchain must be requested before the first QQuickWindow is
+        # created (Qt doc: QQuickWindow::setDefaultAlphaBuffer).
+        from PySide6.QtQuick import QQuickWindow as _QQuickWindow
+
+        _QQuickWindow.setDefaultAlphaBuffer(True)
+        native_bridge = NativeGlassBridge(engine)
+        engine.rootContext().setContextProperty("NativeGlassBridge", native_bridge)
+    engine.rootContext().setContextProperty("UseNativeGlass", glass_available)
     if use_webengine:
         from ai_novel_studio.ui_qml.bridge.editor_bridge import EditorBridge
 
@@ -323,4 +346,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     engine.load(QUrl.fromLocalFile(str(app_qml_path())))
     if not engine.rootObjects():
         return 1
+    if glass_available:
+        # Attach the DWM material after the window exists; the QML retry
+        # timer re-applies after the first show when DWM rejects the early
+        # call (first-show race, same as the Native Glass Lab).
+        native_bridge.setWindow(engine.rootObjects()[0])
+        native_bridge.setDarkMode(theme.property("themeName") == "dark")
+        native_bridge.apply("acrylic")
     return app.exec()
