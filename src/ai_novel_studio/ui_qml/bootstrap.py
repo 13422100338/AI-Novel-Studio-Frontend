@@ -7,12 +7,22 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from PySide6.QtCore import Property, QObject, QUrl, Slot
+from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
 from ai_novel_studio.ui_qml.bridge.mock_novel_studio_facade import MockNovelStudioFacade
 from ai_novel_studio.ui_qml.bridge.theme_provider import ThemeProvider
+from ai_novel_studio.ui_qml.bridge.windows_backdrop import (
+    apply_immersive_dark_mode,
+    apply_redirection_bitmap_alpha,
+    apply_system_backdrop,
+    effective_backdrop_kind,
+    supports_system_backdrop,
+    transparency_effects_enabled,
+    why_not_available,
+    windows_build,
+)
 from ai_novel_studio.ui_qml.editor_runtime import ensure_editor_dist, ensure_qwebchannel_js
 
 _FRONTEND_STATE: dict[int, tuple[MockNovelStudioFacade, ThemeProvider]] = {}
@@ -54,6 +64,115 @@ class BackdropBridge(QObject):
         return apply_system_backdrop(self._window, kind=kind)
 
 
+class NativeGlassBridge(QObject):
+    """System-backdrop capability/control bridge for the Native Glass Lab.
+
+    Consumed only by the ``--native-glass-lab`` experiment page. It keeps the
+    DWM knowledge in Python (platform, Windows build, "Transparency effects"
+    setting, dark-mode tint, redirection-bitmap alpha) so QML only decides
+    presentation. Every failure path keeps ``activeKind == "none"`` so the
+    lab degrades to the app-internal glass route instead of pretending the
+    wallpaper is visible.
+    """
+
+    capabilitiesChanged = Signal()
+
+    def __init__(self, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self._window: QObject | None = None
+        self._requested_kind = "none"
+        self._active_kind = "none"
+        self._dark_mode = False
+
+    def setWindow(self, window: QObject | None) -> None:
+        self._window = window
+        self.capabilitiesChanged.emit()
+
+    @Property(str, constant=True)
+    def platformName(self) -> str:
+        if sys.platform.startswith("win"):
+            return "win32"
+        if sys.platform == "darwin":
+            return "darwin"
+        return sys.platform
+
+    @Property(str, constant=True)
+    def buildText(self) -> str:
+        if os.name != "nt":
+            return "-"
+        return str(windows_build())
+
+    @Property(bool, constant=True)
+    def nativeSupported(self) -> bool:
+        return supports_system_backdrop()
+
+    @Property(bool, constant=True)
+    def transparencyEffects(self) -> bool:
+        return transparency_effects_enabled()
+
+    @Property(str, constant=True)
+    def unsupportedReason(self) -> str:
+        if supports_system_backdrop() and transparency_effects_enabled():
+            return ""
+        return why_not_available()
+
+    @Property(str, notify=capabilitiesChanged)
+    def activeKind(self) -> str:
+        return self._active_kind
+
+    @Property(bool, notify=capabilitiesChanged)
+    def nativeActive(self) -> bool:
+        return self._active_kind != "none"
+
+    @Slot(bool, result=bool)
+    def setDarkMode(self, enabled: bool) -> bool:
+        self._dark_mode = bool(enabled)
+        if self._window is None:
+            return False
+        return apply_immersive_dark_mode(self._window, self._dark_mode)
+
+    @Slot(result=bool)
+    def refresh(self) -> bool:
+        """Re-apply the active DWM attributes (after show / handle rebuild)."""
+        if self._window is None or self._requested_kind == "none":
+            return False
+        return self.apply(self._requested_kind)
+
+    @Slot(str, result=bool)
+    def apply(self, kind: str) -> bool:
+        if self._window is None:
+            self._requested_kind = "none"
+            self._active_kind = "none"
+            self.capabilitiesChanged.emit()
+            return False
+        if kind == "none":
+            # Truly clear the DWM backdrop (DWMSBT_NONE): switching back to
+            # internal/solid must not leave the old material attached to the
+            # window (review S2). Best effort; unsupported platforms no-op.
+            if self._requested_kind != "none":
+                apply_system_backdrop(self._window, kind="none")
+            self._requested_kind = "none"
+            self._active_kind = "none"
+            self.capabilitiesChanged.emit()
+            return False
+        effective = effective_backdrop_kind(kind)
+        if effective == "none":
+            self._requested_kind = "none"
+            self._active_kind = "none"
+            self.capabilitiesChanged.emit()
+            return False
+        self._requested_kind = effective
+        ok = apply_system_backdrop(self._window, kind=effective)
+        if ok:
+            # Best-effort extras: alpha in the DWM redirection bitmap
+            # (24H2+ QML transparent windows) and the immersive dark tint.
+            apply_redirection_bitmap_alpha(self._window)
+            apply_immersive_dark_mode(self._window, self._dark_mode)
+        self._active_kind = effective if ok else "none"
+        self.capabilitiesChanged.emit()
+        return ok
+
+
 def register_frontend_types(
     engine: QQmlApplicationEngine,
     facade: MockNovelStudioFacade | None = None,
@@ -87,6 +206,11 @@ def visual_lab_qml_path() -> Path:
     return Path(__file__).resolve().parent / "qml" / "VisualLab.qml"
 
 
+def native_glass_lab_qml_path() -> Path:
+    """Standalone Native Glass Lab page (isolation ticket: 原生毛玻璃测试界面)."""
+    return Path(__file__).resolve().parent / "qml" / "NativeGlassLab.qml"
+
+
 def create_engine() -> QQmlApplicationEngine:
     """Build the TextArea-mode shell (tests and screenshot baseline)."""
     engine = QQmlApplicationEngine()
@@ -105,7 +229,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = [arg for arg in args if arg != "--textarea"]
     visual_lab = "--visual-lab" in args
     args = [arg for arg in args if arg != "--visual-lab"]
-    if use_webengine and not visual_lab:
+    native_glass_lab = "--native-glass-lab" in args
+    args = [arg for arg in args if arg != "--native-glass-lab"]
+    if use_webengine and not visual_lab and not native_glass_lab:
         # QtWebEngine's GPU compositor on Windows can lose its D3D context
         # during layout-driven resizes (AI dock open/close), leaving a black
         # strip in the newly exposed editor area until the renderer recovers.
@@ -124,6 +250,31 @@ def main(argv: Sequence[str] | None = None) -> int:
     engine = QQmlApplicationEngine()
     engine.addImportPath(str(Path(__file__).resolve().parent / "qml"))
     facade, theme = register_frontend_types(engine)
+    if native_glass_lab:
+        os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
+        # Frameless transparent windows need an alpha channel in the Qt Quick
+        # swapchain; this must be requested before the first QQuickWindow is
+        # created (Qt doc: QQuickWindow::setDefaultAlphaBuffer).
+        from PySide6.QtQuick import QQuickWindow as _QQuickWindow
+
+        _QQuickWindow.setDefaultAlphaBuffer(True)
+        native_bridge = NativeGlassBridge(engine)
+        engine.rootContext().setContextProperty("NativeGlassBridge", native_bridge)
+        _FRONTEND_STATE[id(engine)] = (facade, theme)
+        engine.load(QUrl.fromLocalFile(str(native_glass_lab_qml_path())))
+        if not engine.rootObjects():
+            return 1
+        native_bridge.setWindow(engine.rootObjects()[0])
+        # Default lab state: Desktop Acrylic when the machine supports it.
+        # QML binds its nativeActive/activeKind to the bridge, so this also
+        # drives the window transparency without a button click.
+        theme.setTheme("dark")
+        native_bridge.setDarkMode(True)
+        native_bridge.apply("acrylic")
+        engine.rootContext().setContextProperty(
+            "RenderBackendInfo", _QQuickWindow.sceneGraphBackend() or "unknown"
+        )
+        return app.exec()
     if visual_lab:
         # Basic style so custom `background` items on TextField (VisualLab and
         # FormCard) actually apply instead of being ignored by the native style.

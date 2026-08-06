@@ -36,6 +36,11 @@ Item {
     required property Item sourceItem
 
     property real radius: Theme.tokens.radius.r12
+    // Opaque fallback (Native Glass Lab "solid" mode): when true the surface
+    // renders as a plain opaque theme panel (no capture, no blur, no tint
+    // translucency). Used only by the standalone experiment page; the
+    // production shell keeps the existing Safe-tier behavior.
+    property bool opaqueFallback: false
 
     // ---------------------------------------------------------------------
     // Behavior / test hooks. Safe tier degrades to a fully opaque surface
@@ -43,11 +48,12 @@ Item {
     // real-time capture and blur while the panel is visible.
     // ---------------------------------------------------------------------
     readonly property bool effectActive:
-        visible && Theme.visualQuality !== "safe" && root.sourceItem !== null
+        visible && !root.opaqueFallback && Theme.visualQuality !== "safe"
+        && root.sourceItem !== null
     readonly property bool blurEnabled: root.effectActive
     readonly property rect captureRect: capture.sourceRect
     readonly property color fillColor:
-        Theme.visualQuality === "safe"
+        root.opaqueFallback || Theme.visualQuality === "safe"
             ? Theme.tokens.color.bgSurface
             : Qt.rgba(tintBase.r, tintBase.g, tintBase.b, root.tintOpacity)
 
@@ -71,12 +77,12 @@ Item {
     // is deliberately stronger than Balanced so the tier separation stays
     // visible in every theme, including light.
     readonly property real edgeLightOpacity:
-        Theme.visualQuality === "safe" ? 0.0
+        root.opaqueFallback || Theme.visualQuality === "safe" ? 0.0
             : Theme.visualQuality === "premium"
                 ? parseFloat(Theme.tokens.material.glassEdgeLightPremium)
                 : parseFloat(Theme.tokens.material.glassEdgeLightBalanced)
     readonly property real innerShadowOpacity:
-        Theme.visualQuality === "safe" ? 0.0
+        root.opaqueFallback || Theme.visualQuality === "safe" ? 0.0
             : Theme.visualQuality === "premium"
                 ? parseFloat(Theme.tokens.material.glassInnerShadowPremium)
                 : parseFloat(Theme.tokens.material.glassInnerShadowBalanced)
