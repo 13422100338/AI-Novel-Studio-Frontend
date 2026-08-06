@@ -240,6 +240,83 @@ def _capture_app_content(window: QQuickWindow) -> QImage:
     image = window.grabWindow()
     assert not image.isNull(), "grabWindow returned a null image"
     return image
+
+
+def _capture_screen_composed(
+    window: QQuickWindow,
+) -> QImage | None:
+    """Grab the real screen composition covering this window (DPR-corrected).
+
+    Unlike PrintWindow, this includes the DWM blur layer over the desktop.
+    It is only valid while the window is actually visible on the desktop
+    (a fullscreen exclusive game covering it makes the evidence useless,
+    verified on this machine on 2026-08-06).
+    """
+    screen = window.screen()
+    if screen is None:
+        screen = QGuiApplication.primaryScreen()
+    if screen is None:
+        return None
+    image = screen.grabWindow(0).toImage()
+    if image.isNull():
+        return None
+    dpr = float(screen.devicePixelRatio())
+    geo = window.geometry()
+    screen_geo = screen.geometry()
+    x = round((geo.x() - screen_geo.x()) * dpr)
+    y = round((geo.y() - screen_geo.y()) * dpr)
+    width = round(geo.width() * dpr)
+    height = round(geo.height() * dpr)
+    x = max(0, min(x, image.width() - 1))
+    y = max(0, min(y, image.height() - 1))
+    width = max(1, min(width, image.width() - x))
+    height = max(1, min(height, image.height() - y))
+    crop = image.copy(x, y, width, height)
+    if crop.isNull():
+        return None
+    return crop
+
+
+def _print_background_strip_stats(image: QImage, label: str) -> None:
+    """Stats for a pure-wash strip inside the 40px custom title bar.
+
+    The middle of the title bar (between the title text and the window
+    buttons) contains only the window wash over the DWM backdrop: no panels,
+    no text, no scrollbars. Texture there (blurred stripes/wallpaper) means
+    the DWM material is really sampling the desktop.
+    """
+    if image.isNull():
+        print(f"  {label}: stats skipped (null image)")
+        return
+    # Title bar is the top 40 logical px; sample its middle band (logical
+    # y 12..30) and the horizontal gap between the labels and the buttons
+    # (logical x 30%..62%).
+    y0 = round(image.height() * 0.015)
+    y1 = round(image.height() * 0.037)
+    x0 = round(image.width() * 0.30)
+    x1 = round(image.width() * 0.62)
+    colors: set[tuple[int, int, int]] = set()
+    rs: list[int] = []
+    gs: list[int] = []
+    bs: list[int] = []
+    for y in range(y0, y1):
+        for x in range(x0, x1):
+            c = image.pixelColor(x, y)
+            colors.add((c.red(), c.green(), c.blue()))
+            rs.append(c.red())
+            gs.append(c.green())
+            bs.append(c.blue())
+    import statistics
+
+    print(
+        f"  {label}: unique={len(colors)} "
+        f"mean=({statistics.fmean(rs):.0f},{statistics.fmean(gs):.0f},"
+        f"{statistics.fmean(bs):.0f}) "
+        f"std=({statistics.pstdev(rs):.1f},{statistics.pstdev(gs):.1f},"
+        f"{statistics.pstdev(bs):.1f})"
+    )
+
+
 def _make_topmost(window: QQuickWindow) -> None:
     """Raise the lab above the striped backdrop window (Z-order for DWM).
 
@@ -462,6 +539,23 @@ def main() -> int:
                     print(f"  composed evidence: {composed_path}")
                 else:
                     print("  composed evidence: unavailable (PrintWindow failed)")
+
+                # Real screen composition (includes the DWM blur layer over
+                # the desktop). Valid now that no fullscreen game is covering
+                # the desktop; stats reveal whether the wallpaper texture is
+                # actually blurred into the window background.
+                screen_composed = _capture_screen_composed(root)
+                if screen_composed is not None and not screen_composed.isNull():
+                    screen_path = OUT_DIR / f"native-glass-lab-{stem}-screen.png"
+                    assert screen_composed.save(str(screen_path)), (
+                        f"failed to save {screen_path}"
+                    )
+                    _print_background_strip_stats(screen_composed, stem)
+                else:
+                    print(
+                        "  screen evidence: unavailable "
+                        "(QScreen.grabWindow(0) failed)"
+                    )
         engine.deleteLater()
         return 0
     except Exception as exc:

@@ -169,7 +169,7 @@ ApplicationWindow {
         anchors.fill: parent
         visible: true
         color: root.nativeActive
-            ? root.tint(Theme.tokens.color.bgCanvas, 0.30)
+            ? root.tint(Theme.tokens.color.bgCanvas, 0.15)
             : Theme.tokens.color.bgCanvas
     }
 

@@ -33,6 +33,7 @@ _STRIPES = (
     (30, 136, 229),   # blue
 )
 _STRIPE_W = 96
+_SPLIT = "--split" in sys.argv
 
 
 class StripeBackdrop(QWidget):
@@ -41,17 +42,28 @@ class StripeBackdrop(QWidget):
     def paintEvent(self, event) -> None:  # noqa: N802 (Qt override)
         painter = QPainter(self)
         try:
-            painter.fillRect(self.rect(), QColor(20, 20, 20))
-            index = 0
-            left = 0
-            while left < self.width():
-                r, g, b = _STRIPES[index % len(_STRIPES)]
-                right = min(left + _STRIPE_W, self.width())
+            if _SPLIT:
+                # Two halves: left red, right cyan. Moving the lab window
+                # across the halves must change its acrylic background color
+                # when the DWM material really samples window-behind content.
+                half = self.width() // 2
+                painter.fillRect(0, 0, half, self.height(), QColor(229, 57, 53))
                 painter.fillRect(
-                    left, 0, right - left, self.height(), QColor(r, g, b)
+                    half, 0, self.width() - half, self.height(),
+                    QColor(0, 188, 212),
                 )
-                left = right
-                index += 1
+            else:
+                painter.fillRect(self.rect(), QColor(20, 20, 20))
+                index = 0
+                left = 0
+                while left < self.width():
+                    r, g, b = _STRIPES[index % len(_STRIPES)]
+                    right = min(left + _STRIPE_W, self.width())
+                    painter.fillRect(
+                        left, 0, right - left, self.height(), QColor(r, g, b)
+                    )
+                    left = right
+                    index += 1
         finally:
             painter.end()
 
