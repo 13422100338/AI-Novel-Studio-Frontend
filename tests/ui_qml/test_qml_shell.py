@@ -204,7 +204,10 @@ def test_web_editor_theme_wiring_and_tokens(qtbot: QtBot) -> None:
         / "components"
         / "NovelEditorView.qml"
     ).read_text(encoding="utf-8")
-    assert "backgroundColor: Theme.tokens.color.bgEditor" in editor_qml
+    # Native-glass mode uses the neutral editor sheet; fallback keeps the
+    # theme editor color.
+    assert "Theme.tokens.nativeGlass.editorTint" in editor_qml
+    assert "Theme.tokens.color.bgEditor" in editor_qml
     assert "function applyCurrentTheme" in editor_qml
     assert "window.__novelEditor.applyTheme" in editor_qml
     assert "onTokensChanged" in editor_qml

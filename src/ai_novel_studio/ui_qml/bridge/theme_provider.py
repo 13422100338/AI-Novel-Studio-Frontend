@@ -148,6 +148,49 @@ def _agent_colors() -> dict[str, str]:
     }
 
 
+def _native_glass(theme_name: str) -> dict[str, str]:
+    """Native-glass material semantics (BlockHelm parity, diagnosis doc §11).
+
+    Deliberately NEUTRAL GRAY and independent from the Paper/warm theme:
+    when the DWM Desktop Acrylic is active, the UI must NOT reuse the warm
+    ``bgCanvas/bgSurface`` tints, or the window turns into a cream-colored
+    solid instead of system glass. Alpha is encoded as #AARRGGBB so QML can
+    consume each token directly as a color.
+
+    Framework = glass (translucent); editor keeps a near-opaque readable sheet.
+    """
+    if theme_name == "dark":
+        return {
+            "windowTint": "#1F6E6E6E",      # 12% neutral wash
+            "panelTint": "#4BD2D2D2",        # 29% neutral panel
+            "sidebarTint": "#855A5A5A",      # 52% neutral sidebar
+            "editorTint": "#E0D2D2D2",       # 88% readable editor sheet
+            "border": "#26FFFFFF",
+            "text": "#FFFFFF",
+            "textSecondary": "#D0FFFFFF",
+        }
+    if theme_name == "light":
+        return {
+            "windowTint": "#1C6E6E6E",
+            "panelTint": "#59D2D2D2",
+            "sidebarTint": "#8C6E6E6E",
+            "editorTint": "#E6F5F5F5",
+            "border": "#2EFFFFFF",
+            "text": "#1A1A1A",
+            "textSecondary": "#404040",
+        }
+    # paper theme: glass route still uses neutral gray, NOT the warm paper.
+    return {
+        "windowTint": "#1F6E6E6E",
+        "panelTint": "#4BD2D2D2",
+        "sidebarTint": "#8A5A5A5A",
+        "editorTint": "#E0F5F1E8",
+        "border": "#26FFFFFF",
+        "text": "#FFFFFF",
+        "textSecondary": "#D0FFFFFF",
+    }
+
+
 def _palette(theme_name: str) -> dict[str, object]:
     if theme_name == "paper":
         colors = {
@@ -206,6 +249,7 @@ def _palette(theme_name: str) -> dict[str, object]:
         "elevation": _elevation(),
         "motion": _motion(),
         "agent": _agent_colors(),
+        "nativeGlass": _native_glass(theme_name),
         "spacing": {
             "xs": 4,
             "sm": 8,

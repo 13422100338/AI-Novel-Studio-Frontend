@@ -66,8 +66,13 @@ Item {
     // Native-glass fill: a translucent theme tint so text stays readable
     // while the DWM material shows the desktop/other windows behind it.
     readonly property color nativeGlassFill:
-        Qt.rgba(tintBase.r, tintBase.g, tintBase.b, root.nativeGlassTintOpacity)
-    property real nativeGlassTintOpacity: 0.42
+        !root.useNativeGlassOverride
+            ? Theme.tokens.nativeGlass.panelTint
+            : root.nativeGlassFillOverride
+    // Callers can give a surface its own native fill (e.g. the manuscript
+    // host uses the near-opaque editorTint; chrome uses the thin panelTint).
+    property bool useNativeGlassOverride: false
+    property color nativeGlassFillOverride: "transparent"
 
     property color tintBase: Theme.tokens.material.acrylicTint
     // Tier separation: Balanced keeps a more solid tint (glass reads as
@@ -222,6 +227,7 @@ Item {
         NoiseOverlay {
             anchors.fill: parent
             anchors.margins: 1
+            visible: root.effectActive
         }
 
         Item {

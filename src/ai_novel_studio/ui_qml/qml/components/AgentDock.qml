@@ -53,14 +53,14 @@ Item {
         id: panelSurface
         anchors.fill: parent
         color: root.backdropSource !== null
-            ? Qt.rgba(
-                root.glassColor.r,
-                root.glassColor.g,
-                root.glassColor.b,
-                root.nativeGlassActive
-                    ? 0.42
-                    : (Theme.visualQuality === "premium" ? 0.86 : 0.94)
-            )
+            ? (root.nativeGlassActive
+                ? Theme.tokens.nativeGlass.sidebarTint
+                : Qt.rgba(
+                    root.glassColor.r,
+                    root.glassColor.g,
+                    root.glassColor.b,
+                    Theme.visualQuality === "premium" ? 0.86 : 0.94
+                ))
             : Theme.tokens.color.bgSurface
         border.color: Theme.tokens.color.border
         border.width: 1

@@ -84,3 +84,32 @@ Step 5  æœ€åæ‰æ¢å¤è£…é¥°å±‚
 > Qt + DWM è¶³å¤Ÿæ¥è¿‘ WPF Demoï¼›æ­£å¼ UI å¤±è´¥ä¸»è¦æ¥è‡ªæš–è‰² Paper Themeã€
 > å¤§é¢ç§¯ä¸é€æ˜ WebEngineã€Surface tint ä¸å†å²ç»ç’ƒæ¨¡æ‹Ÿå±‚ã€‚è¯¥å‡è®¾å·²è¢«æœ¬
 > Parity æµ‹è¯•éªŒè¯ä¸ºæˆç«‹ï¼ˆParity é¡µå››æ¨¡å¼è¡Œä¸ºæ­£ç¡®ï¼Œå·®å¼‚åœ¨æ­£å¼ UI è¦†ç›–å±‚ï¼‰ã€‚
+---
+
+## 7. ÕıÊ½ Shell ĞŞ¸´£¨Ö¸ÄÏ ¡ì10£¬ÒÑÊµÊ©£©
+
+Parity PASS ºó°´Ö¸ÄÏ ¡ì10 Ë³ĞòÂäµØ£º
+
+- **Step 1 ¶ÀÁ¢ Native Glass Ö÷ÌâÓïÒå**£¨Ö¸ÄÏ ¡ì11£©£ºThemeProvider ĞÂÔö
+  `Theme.tokens.nativeGlass.*`£¨windowTint/panelTint/sidebarTint/editorTint/
+  border/text£©£¬**ÖĞĞÔ»Ò¡¢²»¶Á Paper Å¯°×**¡£windowWash¡¢panel fill¡¢
+  sidebar¡¢statusBar¡¢AgentDock¡¢editor ±³¾°È«²¿¸Ä¶Á nativeGlass tokens¡£
+- **Step 2 ¿ò¼Ü Surface ±ä±¡**£ºAcrylicSurface native Ä£Ê½Ö±½ÓÏû·Ñ
+  panelTint£¨#AARRGGBB ×Ô´ø alpha£¬Ô¼ 29%£©£¬²¢Òş²Ø native Ä£Ê½ÏÂµÄ
+  NoiseOverlay µÈ×°ÊÎ²ã£»ÕıÎÄ manuscriptHost ÓÃ¸ü²»Í¸Ã÷µÄ editorTint
+  £¨Ô¼ 88%£©±£³Ö¿É¶Á¡£
+- **Step 3 ½µµÍ²»Í¸Ã÷¸²¸Ç**£ºworkspaceHost/WritingPage ¸ù±³¾° native Ê±
+  Í¸Ã÷£¨´ËÇ°ÒÑ×ö£©£¬statusBar ¸Ä°ëÍ¸Ã÷ sidebarTint¡£
+- **Step 4 WebEngine ±à¼­Æ÷**£ºNovelEditorView µÄ backgroundColor Óë
+  Web Ò³ --editor-bg ÔÚ native Ä£Ê½¸ÄÍÆ nativeGlass.editorTint£¨ÖĞĞÔ¿É¶Á
+  Ö½Ãæ£©£¬²»ÔÙÓÃÅ¯°× #FFFDF7¡£
+- Step 5 ×°ÊÎ²ã»Ö¸´£º±¾ÂÖ²»×ö£¨BackdropLayer ÔÚ native Ä£Ê½ÏÂ±£³ÖÒş²Ø£©¡£
+
+ÑéÖ¤£¨2026-08-08£¬¹Ì¶¨ºì/Çà±³¾°£©£º
+
+```text
+ÕıÊ½ Shell acrylic£¨dark£©£ºtitle-bar Ìõ mean=(87,87,87) ÖĞĞÔ»Ò
+ÕıÊ½ Shell solid£¨dark£©£º  title-bar Ìõ mean=(243,239,230) Paper Å¯°×
+```
+
+²îÒìÃ÷ÏÔ£ºÅ¯°×È¾É«ÒÑÒÆ³ı£¬ÕıÊ½´°¿ÚÔÚÏµÍ³ Acrylic ÏÂ³ÊÏÖÖĞĞÔ»Ò²£Á§¡£

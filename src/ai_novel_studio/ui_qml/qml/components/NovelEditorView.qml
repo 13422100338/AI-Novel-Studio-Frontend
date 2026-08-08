@@ -24,7 +24,12 @@ WebEngineView {
     // Paint the view with the editor surface color on every resize/repaint;
     // otherwise QtWebEngine can show the default black canvas while the page
     // re-lays out during dock open/close (C1.5).
-    backgroundColor: Theme.tokens.color.bgEditor
+    // In native-glass mode the editor keeps a near-opaque readable sheet
+    // (nativeGlass.editorTint), NOT the warm Paper color.
+    backgroundColor: typeof UseNativeGlass !== "undefined" && UseNativeGlass
+        && typeof NativeGlassBridge !== "undefined" && NativeGlassBridge.nativeActive
+            ? Theme.tokens.nativeGlass.editorTint
+            : Theme.tokens.color.bgEditor
 
     webChannel: editorChannel
     url: webView.editorUrl
@@ -72,7 +77,12 @@ WebEngineView {
     // the active theme.
     function applyCurrentTheme() {
         var tokens = {
-            "--editor-bg": Theme.tokens.color.bgEditor,
+            "--editor-bg":
+                typeof UseNativeGlass !== "undefined" && UseNativeGlass
+                && typeof NativeGlassBridge !== "undefined"
+                && NativeGlassBridge.nativeActive
+                    ? Theme.tokens.nativeGlass.editorTint
+                    : Theme.tokens.color.bgEditor,
             "--editor-text": Theme.tokens.color.textPrimary,
             "--editor-accent": Theme.tokens.color.accent,
             "--editor-muted": Theme.tokens.color.textSecondary,

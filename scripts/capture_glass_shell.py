@@ -103,11 +103,13 @@ def _capture_shell(app: QGuiApplication, stem: str, glass: bool) -> None:
         bridge.setDarkMode(True)
         bridge.apply("acrylic")
     root.show()
+    _make_topmost(root)
     if glass:
         for _ in range(30):
             if bool(root.property("nativeActive")):
                 break
             bridge.refresh()
+            _make_topmost(root)
             root.raise_()
             root.requestActivate()
             _pump(app, 4)
@@ -135,6 +137,23 @@ def _capture_shell(app: QGuiApplication, stem: str, glass: bool) -> None:
         assert screen.save(str(screen_path)), f"failed to save {screen_path}"
         _print_background_strip_stats(screen, stem)
     engine.deleteLater()
+
+
+def _make_topmost(window: QQuickWindow) -> None:
+    """Force the shell window above the full-screen stripe backdrop."""
+    import ctypes
+
+    if os.name != "nt":
+        return
+    try:
+        hwnd = ctypes.wintypes.HWND(int(window.winId()))
+    except (AttributeError, TypeError, ValueError):
+        return
+    user32 = ctypes.WinDLL("user32")
+    user32.SetWindowPos(
+        hwnd, ctypes.wintypes.HWND(-1), 0, 0, 0, 0,  # HWND_TOPMOST
+        0x0001 | 0x0002 | 0x0010,
+    )
 
 
 def main() -> int:

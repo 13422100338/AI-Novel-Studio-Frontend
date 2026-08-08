@@ -93,6 +93,8 @@ Item {
             radius: Theme.tokens.radius.r16
             sourceItem: root.backdropSource
             nativeGlassActive: root.nativeGlassActive
+            useNativeGlassOverride: root.nativeGlassActive
+            nativeGlassFillOverride: Theme.tokens.nativeGlass.editorTint
             clip: true
 
             ScrollView {

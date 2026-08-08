@@ -62,7 +62,11 @@ def test_theme_propagates_to_page_root_and_mount() -> None:
 
 def test_webengine_view_has_explicit_background_color() -> None:
     qml = _read(_WEBVIEW_QML)
-    assert "backgroundColor: Theme.tokens.color.bgEditor" in qml
+    # Explicit canvas color in both routes: native-glass neutral editor sheet
+    # and the regular theme editor color.
+    assert "backgroundColor:" in qml
+    assert "Theme.tokens.nativeGlass.editorTint" in qml
+    assert "Theme.tokens.color.bgEditor" in qml
 
 
 def test_agent_dock_geometry_switches_in_one_step() -> None:

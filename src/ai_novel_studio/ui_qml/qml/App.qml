@@ -88,7 +88,7 @@ ApplicationWindow {
         objectName: "f1WindowWash"
         anchors.fill: parent
         visible: window.nativeGlass && window.nativeActive
-        color: window.tint(Theme.tokens.color.bgCanvas, 0.15)
+        color: Theme.tokens.nativeGlass.windowTint
         z: 0
     }
 
@@ -247,8 +247,12 @@ ApplicationWindow {
             id: statusBar
             Layout.fillWidth: true
             Layout.preferredHeight: 30
-            color: Theme.tokens.color.bgSurface
-            border.color: Theme.tokens.color.border
+            color: window.nativeGlassActive
+                ? Theme.tokens.nativeGlass.sidebarTint
+                : Theme.tokens.color.bgSurface
+            border.color: window.nativeGlassActive
+                ? Theme.tokens.nativeGlass.border
+                : Theme.tokens.color.border
             border.width: 1
 
             RowLayout {
