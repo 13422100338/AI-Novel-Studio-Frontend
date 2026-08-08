@@ -307,6 +307,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         # QML binds its nativeActive/activeKind to the bridge, so this also
         # drives the window transparency without a button click.
         theme.setTheme("dark")
+        theme.setVisualQuality("premium")
         native_bridge.setDarkMode(True)
         native_bridge.apply("acrylic")
         engine.rootContext().setContextProperty(

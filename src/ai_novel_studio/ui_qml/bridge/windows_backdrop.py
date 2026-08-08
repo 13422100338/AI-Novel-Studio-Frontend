@@ -31,6 +31,12 @@ from typing import Any
 _DWMWA_SYSTEMBACKDROP_TYPE = 38
 _DWMWA_USE_IMMERSIVE_DARK_MODE = 20
 _DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 = 19
+# BlockHelm-compatible chrome attributes (dwmapi.h):
+_DWMWA_WINDOW_CORNER_PREFERENCE = 33
+_DWMWA_BORDER_COLOR = 34
+_DWM_WINDOW_CORNER_PREFERENCE_ROUND = 2
+# 0xFFFFFFFE tells DWM "no border color" (matches the reference launcher).
+_DWMWA_BORDER_COLOR_NONE = 0xFFFFFFFE
 # Windows 11 24H2+ (build 26100+) redirection-bitmap alpha. Some Qt backends
 # redraw through a DWM redirection bitmap that treats alpha as opaque unless
 # this attribute is requested; without it the system backdrop is composed as
@@ -167,8 +173,6 @@ def extend_frame_into_client_area(hwnd: int) -> int:
         return int(result)
     except (AttributeError, OSError, TypeError, ValueError):
         return 0x80070057
-
-
 def transparency_effects_enabled() -> bool:
     """Read the system "Transparency effects" setting (registry).
 
@@ -285,6 +289,11 @@ def system_backdrop_result(window: Any, kind: str = "acrylic") -> dict[str, obje
     result["hwnd_valid"] = True
     result["backdrop_type"] = _BACKDROP_NAMES.get(backdrop_type, str(backdrop_type))
     result["extend_frame_hresult"] = extend_frame_into_client_area(hwnd)
+    # Same chrome sequence as the reference implementation: rounded corners +
+    # neutral border, then the system backdrop.
+    _dwm_set_int_hresult(hwnd, _DWMWA_WINDOW_CORNER_PREFERENCE,
+                         _DWM_WINDOW_CORNER_PREFERENCE_ROUND)
+    _dwm_set_int_hresult(hwnd, _DWMWA_BORDER_COLOR, _DWMWA_BORDER_COLOR_NONE)
     result["set_backdrop_hresult"] = _dwm_set_backdrop_hresult(hwnd, backdrop_type)
     result["ok"] = (
         result["extend_frame_hresult"] == 0
