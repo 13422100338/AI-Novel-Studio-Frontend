@@ -247,6 +247,11 @@ def native_glass_lab_qml_path() -> Path:
     return Path(__file__).resolve().parent / "qml" / "NativeGlassLab.qml"
 
 
+def blockhelm_parity_qml_path() -> Path:
+    """BlockHelm Parity Mode (diagnosis): minimal Qt/DWM parity page."""
+    return Path(__file__).resolve().parent / "qml" / "BlockHelmParity.qml"
+
+
 def create_engine() -> QQmlApplicationEngine:
     """Build the TextArea-mode shell (tests and screenshot baseline)."""
     engine = QQmlApplicationEngine()
@@ -267,9 +272,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = [arg for arg in args if arg != "--visual-lab"]
     native_glass_lab = "--native-glass-lab" in args
     args = [arg for arg in args if arg != "--native-glass-lab"]
+    blockhelm_parity = "--blockhelm-parity" in args
+    args = [arg for arg in args if arg != "--blockhelm-parity"]
     use_native_glass = "--no-glass" not in args
     args = [arg for arg in args if arg != "--no-glass"]
-    if use_webengine and not visual_lab and not native_glass_lab:
+    if use_webengine and not visual_lab and not native_glass_lab and not blockhelm_parity:
         # QtWebEngine's GPU compositor on Windows can lose its D3D context
         # during layout-driven resizes (AI dock open/close), leaving a black
         # strip in the newly exposed editor area until the renderer recovers.
@@ -308,6 +315,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         # drives the window transparency without a button click.
         theme.setTheme("dark")
         theme.setVisualQuality("premium")
+        native_bridge.setDarkMode(True)
+        native_bridge.apply("acrylic")
+        engine.rootContext().setContextProperty(
+            "RenderBackendInfo", _QQuickWindow.sceneGraphBackend() or "unknown"
+        )
+        return app.exec()
+    if blockhelm_parity:
+        # Parity diagnosis page: frameless transparent window with a real DWM
+        # bridge. The page itself is deliberately neutral-gray and minimal,
+        # so it can be compared 1:1 with the user-approved WPF demo.
+        from PySide6.QtQuick import QQuickWindow as _QQuickWindow
+
+        _QQuickWindow.setDefaultAlphaBuffer(True)
+        native_bridge = NativeGlassBridge(engine)
+        engine.rootContext().setContextProperty("NativeGlassBridge", native_bridge)
+        _FRONTEND_STATE[id(engine)] = (facade, theme)
+        engine.load(QUrl.fromLocalFile(str(blockhelm_parity_qml_path())))
+        if not engine.rootObjects():
+            return 1
+        native_bridge.setWindow(engine.rootObjects()[0])
         native_bridge.setDarkMode(True)
         native_bridge.apply("acrylic")
         engine.rootContext().setContextProperty(
