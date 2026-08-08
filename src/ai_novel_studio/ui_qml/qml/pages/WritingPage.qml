@@ -129,6 +129,11 @@ Item {
                     id: webEditor
                     objectName: "novelEditorView"
                     editorUrl: EditorAssets.indexUrl
+                    // Static: QtWebEngine must not re-bind its canvas color to
+                    // the live bridge (crashes on capability emit). The
+                    // manuscript host around it is the glass; the editor
+                    // sheet stays on the theme editor color for readability.
+                    editorSurfaceColor: Theme.tokens.color.bgEditor
 
                     function loadCurrentChapter() {
                         var payload = {
