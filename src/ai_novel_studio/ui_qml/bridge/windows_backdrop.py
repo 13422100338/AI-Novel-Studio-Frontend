@@ -57,6 +57,13 @@ _BACKDROP_KINDS = {
     "mica-alt": DWMSBT_TABBEDWINDOW,
 }
 
+_BACKDROP_NAMES = {
+    DWMSBT_NONE: "NONE",
+    DWMSBT_MAINWINDOW: "MAINWINDOW",
+    DWMSBT_TRANSIENTWINDOW: "TRANSIENT_WINDOW",
+    DWMSBT_TABBEDWINDOW: "TABBEDWINDOW",
+}
+
 
 def windows_build() -> int:
     """Return the current Windows build number, or 0 on non-Windows."""
@@ -102,6 +109,64 @@ def _dwm_set_int(hwnd: int, attribute: int, value: int) -> bool:
 def _dwm_set_backdrop(hwnd: int, backdrop_type: int) -> bool:
     """Call DwmSetWindowAttribute(DWMWA_SYSTEMBACKDROP_TYPE)."""
     return _dwm_set_int(hwnd, _DWMWA_SYSTEMBACKDROP_TYPE, backdrop_type)
+
+
+def _dwm_set_int_hresult(hwnd: int, attribute: int, value: int) -> int:
+    """DwmSetWindowAttribute returning the raw HRESULT (0 == S_OK)."""
+    try:
+        dwmapi = ctypes.WinDLL("dwmapi")
+        setter = dwmapi.DwmSetWindowAttribute
+        setter.restype = ctypes.c_long
+        setter.argtypes = [
+            wintypes.HWND,
+            ctypes.c_uint,
+            wintypes.LPVOID,
+            ctypes.c_uint,
+        ]
+        attr = ctypes.c_uint(attribute)
+        payload = ctypes.c_int(value)
+        result = setter(
+            wintypes.HWND(int(hwnd)),
+            attr,
+            ctypes.byref(payload),
+            ctypes.sizeof(payload),
+        )
+        return int(result)
+    except (AttributeError, OSError, TypeError, ValueError):
+        return 0x80070057  # E_INVALIDARG-ish fallback for missing API
+
+
+def _dwm_set_backdrop_hresult(hwnd: int, backdrop_type: int) -> int:
+    """DwmSetWindowAttribute(DWMWA_SYSTEMBACKDROP_TYPE) -> HRESULT."""
+    return _dwm_set_int_hresult(hwnd, _DWMWA_SYSTEMBACKDROP_TYPE, backdrop_type)
+
+
+def extend_frame_into_client_area(hwnd: int) -> int:
+    """DwmExtendFrameIntoClientArea(hwnd, MARGINS{-1,...}) -> HRESULT.
+
+    ``margins = -1`` makes the whole client area part of the glass frame.
+    This is the classic companion of ``DWMSBT_TRANSIENTWINDOW`` for getting
+    the DWM blur into the client area of a frameless window.
+    """
+
+    class MARGINS(ctypes.Structure):
+        _fields_ = [
+            ("cxLeftWidth", wintypes.LONG),
+            ("cxRightWidth", wintypes.LONG),
+            ("cyTopHeight", wintypes.LONG),
+            ("cyBottomHeight", wintypes.LONG),
+        ]
+
+    try:
+        dwmapi = ctypes.WinDLL("dwmapi")
+        fn = dwmapi.DwmExtendFrameIntoClientArea
+        fn.restype = ctypes.c_long
+        fn.argtypes = [wintypes.HWND, ctypes.POINTER(MARGINS)]
+        margins = MARGINS(-1, -1, -1, -1)
+        result = fn(wintypes.HWND(int(hwnd)), ctypes.byref(margins))
+        return int(result)
+    except (AttributeError, OSError, TypeError, ValueError):
+        return 0x80070057
 
 
 def transparency_effects_enabled() -> bool:
@@ -195,3 +260,34 @@ def apply_system_backdrop(window: Any, kind: str = "mica") -> bool:
     except (AttributeError, TypeError, ValueError):
         return False
     return _dwm_set_backdrop(hwnd, backdrop_type)
+
+
+def system_backdrop_result(window: Any, kind: str = "acrylic") -> dict[str, object]:
+    """Full DWM call sequence with HRESULTs for the lab log panel.
+
+    Mirrors the documented GlassLab log:
+      hwnd_valid / extend_frame_hresult / set_backdrop_hresult / backdrop_type
+    """
+    result: dict[str, object] = {
+        "hwnd_valid": False,
+        "extend_frame_hresult": None,
+        "set_backdrop_hresult": None,
+        "backdrop_type": None,
+        "ok": False,
+    }
+    backdrop_type = _BACKDROP_KINDS.get(kind)
+    if backdrop_type is None or not supports_system_backdrop():
+        return result
+    try:
+        hwnd = int(window.winId())
+    except (AttributeError, TypeError, ValueError):
+        return result
+    result["hwnd_valid"] = True
+    result["backdrop_type"] = _BACKDROP_NAMES.get(backdrop_type, str(backdrop_type))
+    result["extend_frame_hresult"] = extend_frame_into_client_area(hwnd)
+    result["set_backdrop_hresult"] = _dwm_set_backdrop_hresult(hwnd, backdrop_type)
+    result["ok"] = (
+        result["extend_frame_hresult"] == 0
+        and result["set_backdrop_hresult"] == 0
+    )
+    return result

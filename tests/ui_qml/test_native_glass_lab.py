@@ -66,6 +66,13 @@ class FakeNativeGlassBridge(QObject):
         self.dark_mode_calls: list[bool] = []
         self.refresh_calls = 0
         self._active_kind = "none"
+        self._last_result: dict[str, object] = {
+            "hwnd_valid": False,
+            "extend_frame_hresult": None,
+            "set_backdrop_hresult": None,
+            "backdrop_type": "NONE",
+            "ok": False,
+        }
 
     @Property(str, constant=True)
     def platformName(self) -> str:
@@ -95,14 +102,32 @@ class FakeNativeGlassBridge(QObject):
     def nativeActive(self) -> bool:
         return self._active_kind != "none"
 
+    @Property("QVariantMap", notify=capabilitiesChanged)  # type: ignore[arg-type]
+    def lastBackdropResult(self) -> dict[str, object]:
+        return self._last_result
+
     @Slot(str, result=bool)
     def apply(self, kind: str) -> bool:
         self.calls.append(kind)
         if kind == "none":
             self._active_kind = "none"
+            self._last_result = {
+                "hwnd_valid": True,
+                "extend_frame_hresult": 0,
+                "set_backdrop_hresult": 0,
+                "backdrop_type": "NONE",
+                "ok": False,
+            }
             self.capabilitiesChanged.emit()
             return False
         self._active_kind = kind if self.apply_result else "none"
+        self._last_result = {
+            "hwnd_valid": self.apply_result,
+            "extend_frame_hresult": 0 if self.apply_result else 0x80070057,
+            "set_backdrop_hresult": 0 if self.apply_result else 0x80070057,
+            "backdrop_type": kind.upper() if self.apply_result else "NONE",
+            "ok": self.apply_result,
+        }
         self.capabilitiesChanged.emit()
         return self.apply_result
 
@@ -306,3 +331,45 @@ def test_status_bar_at_window_bottom(qtbot: QtBot) -> None:
     assert status is not None
     bottom = float(status.y()) + float(status.height())
     assert abs(bottom - float(window.height())) < 2
+
+
+def test_glass_control_panel_knobs(qtbot: QtBot) -> None:
+    """Wash/panel opacity knobs exist and drive the lab properties."""
+    _, _, _, _, window = _load_lab(qtbot)
+    qtbot.wait(30)
+    wash = _find_item(_content(window), "ngWashSlider")
+    panel = _find_item(_content(window), "ngPanelSlider")
+    assert wash is not None and panel is not None
+
+    wash.setProperty("value", 0.30)
+    qtbot.wait(30)
+    assert abs(float(window.property("washAlpha")) - 0.30) < 0.01
+
+    panel.setProperty("value", 0.60)
+    qtbot.wait(30)
+    assert abs(float(window.property("panelOpacity")) - 0.60) < 0.01
+
+
+def test_dwm_log_panel_reports_ok_and_failure(qtbot: QtBot) -> None:
+    """The log line reflects the last DWM call result."""
+    _, _, _, bridge, window = _load_lab(qtbot)
+    qtbot.wait(30)
+    log = _find_item(_content(window), "ngDwmLog")
+    assert log is not None
+
+    # Failure path: apply_result False -> HWND FAIL / Visual FAIL.
+    bridge.apply_result = False
+    assert bridge.apply("acrylic") is False
+    qtbot.wait(30)
+    text = str(log.property("text"))
+    assert "HWND FAIL" in text or "HWND false" in text
+    assert "Visual FAIL" in text
+
+    # Success path: apply_result True -> HWND OK / TRANSIENT / Visual PARTIAL.
+    bridge.apply_result = True
+    assert bridge.apply("acrylic") is True
+    qtbot.wait(30)
+    text = str(log.property("text"))
+    assert "HWND OK" in text
+    assert "ACRYLIC" in text
+    assert "Visual PARTIAL" in text

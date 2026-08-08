@@ -42,6 +42,11 @@ ApplicationWindow {
         typeof NativeGlassBridge !== "undefined"
             ? NativeGlassBridge.activeKind : "none"
     property string statusReason: ""
+    // GlassLab control-panel knobs (feasibility doc: window tint / surface
+    // translucency are user-adjustable so the material effect can be judged
+    // at several opacities, not just one hard-coded value).
+    property real washAlpha: 0.15
+    property real panelOpacity: 1.0
     readonly property bool nativeSupported:
         typeof NativeGlassBridge !== "undefined" && NativeGlassBridge.nativeSupported
     readonly property bool nativeActive:
@@ -169,7 +174,7 @@ ApplicationWindow {
         anchors.fill: parent
         visible: true
         color: root.nativeActive
-            ? root.tint(Theme.tokens.color.bgCanvas, 0.15)
+            ? root.tint(Theme.tokens.color.bgCanvas, root.washAlpha)
             : Theme.tokens.color.bgCanvas
     }
 
@@ -211,7 +216,10 @@ ApplicationWindow {
             anchors.fill: parent
             radius: panel.radius
             visible: root.mode === "native"
-            color: root.tint(Theme.tokens.color.bgSurface, panel.translucency)
+            color: root.tint(
+                Theme.tokens.color.bgSurface,
+                panel.translucency * root.panelOpacity
+            )
             border.color: Theme.tokens.color.border
             border.width: 1
         }
@@ -364,6 +372,90 @@ ApplicationWindow {
                     font.pixelSize: 11
                     color: root.nativeActive
                         ? Theme.tokens.color.success : Theme.tokens.color.textSecondary
+                }
+            }
+        }
+
+        // --- GlassLab control panel: opacity knobs + DWM log --------------
+        Item {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 34
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 14
+                anchors.rightMargin: 14
+                spacing: 10
+
+                Text {
+                    text: "前景染色"
+                    font.pixelSize: 11
+                    color: Theme.tokens.color.textSecondary
+                }
+                Slider {
+                    id: washSlider
+                    objectName: "ngWashSlider"
+                    from: 0.05
+                    to: 0.45
+                    stepSize: 0.05
+                    value: root.washAlpha
+                    Layout.preferredWidth: 140
+                    onValueChanged: root.washAlpha = value
+                }
+                Text {
+                    text: (root.washAlpha * 100).toFixed(0) + "%"
+                    font.pixelSize: 11
+                    color: Theme.tokens.color.textSecondary
+                }
+
+                Text {
+                    text: "面板不透明度"
+                    font.pixelSize: 11
+                    color: Theme.tokens.color.textSecondary
+                }
+                Slider {
+                    id: panelSlider
+                    objectName: "ngPanelSlider"
+                    from: 0.5
+                    to: 1.0
+                    stepSize: 0.05
+                    value: root.panelOpacity
+                    Layout.preferredWidth: 140
+                    onValueChanged: root.panelOpacity = value
+                }
+                Text {
+                    text: (root.panelOpacity * 100).toFixed(0) + "%"
+                    font.pixelSize: 11
+                    color: Theme.tokens.color.textSecondary
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Text {
+                    objectName: "ngDwmLog"
+                    text: {
+                        if (typeof NativeGlassBridge === "undefined") {
+                            return "DWM 日志：未接入"
+                        }
+                        const r = NativeGlassBridge.lastBackdropResult
+                        const hwnd = r["hwnd_valid"] ? "OK" : "FAIL"
+                        const extHr = r["extend_frame_hresult"] === undefined
+                            ? 0 : r["extend_frame_hresult"]
+                        const setHr = r["set_backdrop_hresult"] === undefined
+                            ? 0 : r["set_backdrop_hresult"]
+                        const extend = extHr === 0 ? "OK" : "0x" + extHr.toString(16)
+                        const set = setHr === 0 ? "OK" : "0x" + setHr.toString(16)
+                        const kind = r["backdrop_type"] === undefined
+                            ? "NONE" : r["backdrop_type"]
+                        const qt = root.nativeActive ? "OK" : "BLOCKED"
+                        const visual = root.nativeActive ? "PARTIAL" : "FAIL"
+                        return "HWND " + hwnd + " | Extend " + extend
+                            + " | Backdrop " + set + " | " + kind
+                            + " | Qt " + qt + " | Visual " + visual
+                    }
+                    font.pixelSize: 10
+                    color: Theme.tokens.color.textSecondary
+                    elide: Text.ElideRight
                 }
             }
         }

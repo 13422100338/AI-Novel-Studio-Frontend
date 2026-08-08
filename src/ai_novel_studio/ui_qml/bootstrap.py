@@ -19,6 +19,7 @@ from ai_novel_studio.ui_qml.bridge.windows_backdrop import (
     apply_system_backdrop,
     effective_backdrop_kind,
     supports_system_backdrop,
+    system_backdrop_result,
     transparency_effects_enabled,
     why_not_available,
     windows_build,
@@ -83,6 +84,13 @@ class NativeGlassBridge(QObject):
         self._requested_kind = "none"
         self._active_kind = "none"
         self._dark_mode = False
+        self._last_result: dict[str, object] = {
+            "hwnd_valid": False,
+            "extend_frame_hresult": None,
+            "set_backdrop_hresult": None,
+            "backdrop_type": "NONE",
+            "ok": False,
+        }
 
     def setWindow(self, window: QObject | None) -> None:
         self._window = window
@@ -124,6 +132,11 @@ class NativeGlassBridge(QObject):
     def nativeActive(self) -> bool:
         return self._active_kind != "none"
 
+    @Property("QVariantMap", notify=capabilitiesChanged)  # type: ignore[arg-type]
+    def lastBackdropResult(self) -> dict[str, object]:
+        """Last DWM call sequence (hwnd/HRESULTs) for the lab log panel."""
+        return self._last_result
+
     @Slot(bool, result=bool)
     def setDarkMode(self, enabled: bool) -> bool:
         self._dark_mode = bool(enabled)
@@ -143,6 +156,13 @@ class NativeGlassBridge(QObject):
         if self._window is None:
             self._requested_kind = "none"
             self._active_kind = "none"
+            self._last_result = {
+                "hwnd_valid": False,
+                "extend_frame_hresult": None,
+                "set_backdrop_hresult": None,
+                "backdrop_type": "NONE",
+                "ok": False,
+            }
             self.capabilitiesChanged.emit()
             return False
         if kind == "none":
@@ -153,16 +173,32 @@ class NativeGlassBridge(QObject):
                 apply_system_backdrop(self._window, kind="none")
             self._requested_kind = "none"
             self._active_kind = "none"
+            self._last_result = {
+                "hwnd_valid": True,
+                "extend_frame_hresult": 0,
+                "set_backdrop_hresult": 0,
+                "backdrop_type": "NONE",
+                "ok": False,
+            }
             self.capabilitiesChanged.emit()
             return False
         effective = effective_backdrop_kind(kind)
         if effective == "none":
             self._requested_kind = "none"
             self._active_kind = "none"
+            self._last_result = {
+                "hwnd_valid": True,
+                "extend_frame_hresult": None,
+                "set_backdrop_hresult": None,
+                "backdrop_type": "NONE",
+                "ok": False,
+            }
             self.capabilitiesChanged.emit()
             return False
         self._requested_kind = effective
-        ok = apply_system_backdrop(self._window, kind=effective)
+        result = system_backdrop_result(self._window, kind=effective)
+        self._last_result = result
+        ok = bool(result.get("ok"))
         if ok:
             # Best-effort extras: alpha in the DWM redirection bitmap
             # (24H2+ QML transparent windows) and the immersive dark tint.

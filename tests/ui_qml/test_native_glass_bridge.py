@@ -28,6 +28,7 @@ def _install_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     fake.apply_result = True
     fake.effective_kind = lambda requested: requested
     fake.apply_system_backdrop_calls = []
+    fake.system_backdrop_result_calls = []
     fake.redirection_calls = []
     fake.dark_mode_calls = []
     fake.supports = True
@@ -38,6 +39,17 @@ def _install_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     def apply_system_backdrop(window, kind="mica"):
         fake.apply_system_backdrop_calls.append((window, kind))
         return fake.apply_result
+
+    def system_backdrop_result(window, kind="acrylic"):
+        fake.system_backdrop_result_calls.append((window, kind))
+        ok = bool(fake.apply_result)
+        return {
+            "hwnd_valid": True,
+            "extend_frame_hresult": 0 if ok else 0x80070057,
+            "set_backdrop_hresult": 0 if ok else 0x80070057,
+            "backdrop_type": "TRANSIENT_WINDOW" if ok else "NONE",
+            "ok": ok,
+        }
 
     def effective_backdrop_kind(requested):
         return fake.effective_kind(requested)
@@ -51,6 +63,7 @@ def _install_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         return True
 
     monkeypatch.setattr(bootstrap, "apply_system_backdrop", apply_system_backdrop)
+    monkeypatch.setattr(bootstrap, "system_backdrop_result", system_backdrop_result)
     monkeypatch.setattr(bootstrap, "effective_backdrop_kind", effective_backdrop_kind)
     monkeypatch.setattr(bootstrap, "apply_redirection_bitmap_alpha", redirection_bitmap_alpha)
     monkeypatch.setattr(bootstrap, "apply_immersive_dark_mode", immersive_dark_mode)
@@ -97,7 +110,7 @@ def test_apply_acrylic_success_sets_state_and_applies_extras(glass_env) -> None:
     assert bridge.activeKind == "acrylic"
     assert bridge.nativeActive is True
     assert bridge._requested_kind == "acrylic"
-    assert glass_env.apply_system_backdrop_calls == [(window, "acrylic")]
+    assert glass_env.system_backdrop_result_calls == [(window, "acrylic")]
     assert glass_env.redirection_calls == [window]
     assert glass_env.dark_mode_calls == [(window, False)]
 
@@ -113,7 +126,7 @@ def test_apply_failure_resets_active_state_and_emits(glass_env) -> None:
 
     assert bridge.activeKind == "none"
     assert bridge.nativeActive is False
-    assert glass_env.apply_system_backdrop_calls == [(window, "acrylic")]
+    assert glass_env.system_backdrop_result_calls == [(window, "acrylic")]
     assert glass_env.redirection_calls == []
     assert glass_env.dark_mode_calls == []
     assert emitted == [True]
@@ -126,6 +139,7 @@ def test_apply_none_after_active_kind_clears_dwm(glass_env) -> None:
     assert bridge.apply("acrylic") is True
 
     glass_env.apply_system_backdrop_calls.clear()
+    glass_env.system_backdrop_result_calls.clear()
     glass_env.redirection_calls.clear()
     glass_env.dark_mode_calls.clear()
 
@@ -167,12 +181,13 @@ def test_refresh_replays_requested_acrylic(glass_env) -> None:
     assert bridge.apply("acrylic") is True
 
     glass_env.apply_system_backdrop_calls.clear()
+    glass_env.system_backdrop_result_calls.clear()
     glass_env.redirection_calls.clear()
     glass_env.dark_mode_calls.clear()
 
     assert bridge.refresh() is True
 
-    assert glass_env.apply_system_backdrop_calls == [(window, "acrylic")]
+    assert glass_env.system_backdrop_result_calls == [(window, "acrylic")]
     assert glass_env.redirection_calls == [window]
     assert glass_env.dark_mode_calls == [(window, False)]
     assert bridge.activeKind == "acrylic"
