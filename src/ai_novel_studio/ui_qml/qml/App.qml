@@ -199,7 +199,12 @@ ApplicationWindow {
                 objectName: "workspaceHost"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                color: Theme.tokens.color.bgCanvas
+                // BlockHelm-style backdrop: when the DWM Desktop Acrylic is
+                // active the whole central workspace is transparent so the
+                // window-behind content shows through; the fallback keeps the
+                // opaque theme canvas.
+                color: window.nativeGlass && window.nativeActive
+                    ? "transparent" : Theme.tokens.color.bgCanvas
 
                 StackLayout {
                     anchors.fill: parent
@@ -209,6 +214,7 @@ ApplicationWindow {
                         id: writingPage
                         useWebEngine: window.useWebEngine
                         backdropSource: backgroundLayer
+                        nativeGlassActive: window.nativeGlass && window.nativeActive
                     }
 
                     MemoryLibraryPage {}

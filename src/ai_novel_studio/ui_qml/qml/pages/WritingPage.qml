@@ -9,13 +9,17 @@ Item {
 
     property bool useWebEngine: false
     property string lastEditorChapterId: ""
+    // DWM Desktop Acrylic is active on the shell window: drop the opaque page
+    // backdrop so the window-behind content shows through (BlockHelm-style).
+    property bool nativeGlassActive: false
     // Window backdrop passed from the shell; the manuscript host becomes an
     // Acrylic surface over it (same glass language as nav/sidebar/dock).
     property Item backdropSource: null
 
     Rectangle {
         anchors.fill: parent
-        color: Theme.tokens.color.bgCanvas
+        color: root.nativeGlassActive
+            ? "transparent" : Theme.tokens.color.bgCanvas
     }
 
     ColumnLayout {
