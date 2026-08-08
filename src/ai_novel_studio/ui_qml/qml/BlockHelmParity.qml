@@ -102,9 +102,28 @@ Window {
     }
 
     // ---- Mode switcher ----------------------------------------------------
+    // Full-width drag strip on top (frameless window needs it).
+    Item {
+        id: dragStrip
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 40
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton
+            onPressed: {
+                if (typeof root.startSystemMove === "function") {
+                    root.startSystemMove()
+                }
+            }
+        }
+    }
+
     Row {
         id: modeBar
-        anchors.top: parent.top
+        anchors.top: dragStrip.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.margins: 14
@@ -138,6 +157,25 @@ Window {
                     anchors.fill: parent
                     onClicked: root.selectMode(modelData.key)
                 }
+            }
+        }
+
+        Rectangle {
+            width: 72
+            height: 30
+            radius: 6
+            color: Qt.rgba(1, 1, 1, 0.12)
+            border.color: Qt.rgba(1, 1, 1, 0.18)
+            border.width: 1
+            Text {
+                anchors.centerIn: parent
+                text: "× 关闭"
+                color: "#FFFFFF"
+                font.pixelSize: 12
+            }
+            MouseArea {
+                anchors.fill: parent
+                onClicked: root.close()
             }
         }
     }
