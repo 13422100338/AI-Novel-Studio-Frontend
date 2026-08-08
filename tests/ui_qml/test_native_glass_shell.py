@@ -153,6 +153,12 @@ def test_native_glass_shell_uses_tint_not_in_app_blur(qtbot: QtBot) -> None:
         alpha = QColor(surface.property("nativeGlassFill")).alpha()
         assert 0 < alpha < 255, f"{name} should be a translucent tint"
 
+    # BlockHelm-style: the in-app decorative backdrop is hidden so the DWM
+    # material behind the window is the only backdrop.
+    backdrop = _find_item(window.contentItem(), "f1BackgroundLayer")
+    assert backdrop is not None
+    assert backdrop.property("visible") is False
+
 
 def test_shell_glass_retry_timer_is_bounded(qtbot: QtBot) -> None:
     """The DWM retry counter exists and stays bounded for tests."""

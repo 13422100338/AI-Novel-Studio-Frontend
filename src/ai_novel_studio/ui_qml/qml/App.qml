@@ -22,6 +22,7 @@ ApplicationWindow {
     property bool nativeGlass: typeof UseNativeGlass !== "undefined" && UseNativeGlass
     readonly property bool nativeActive:
         typeof NativeGlassBridge !== "undefined" && NativeGlassBridge.nativeActive
+    readonly property bool nativeGlassActive: nativeGlass && nativeActive
     flags: window.nativeGlass ? Qt.FramelessWindowHint : Qt.Window
     color: window.nativeGlass && window.nativeActive
         ? "transparent" : Theme.tokens.color.bgCanvas
@@ -93,10 +94,14 @@ ApplicationWindow {
 
     // App-controlled backdrop (glass-UI route): the window stays opaque and
     // this themed layer is the blur source for the Acrylic columns above.
+    // In BlockHelm-style native glass mode this decorative layer is hidden:
+    // the DWM Desktop Acrylic behind the window is the ONLY backdrop, so no
+    // in-app cards/glows/geometry clutter the glass.
     BackdropLayer {
         id: backgroundLayer
         objectName: "f1BackgroundLayer"
         anchors.fill: parent
+        visible: !window.nativeGlassActive
         washEnabled: false
     }
 
