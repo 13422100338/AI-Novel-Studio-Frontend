@@ -188,9 +188,22 @@ ApplicationWindow {
         washEnabled: false
     }
 
+    // BlockHelm-style "Image Mode" backdrop source: a fixed high-contrast
+    // scene blurred by the Acrylic surfaces above. The outline stays
+    // recognizable (unlike the DWM material), so the internal-glass route
+    // reads as glass instead of a flat tint.
+    ImageBackdropSource {
+        id: imageBackdropLayer
+        objectName: "ngImageBackdropLayer"
+        anchors.fill: parent
+        visible: root.mode === "image"
+    }
+
     // --- Local glass panel -------------------------------------------------
     // native: translucent theme fill over the DWM backdrop.
-    // internal: real-time app-internal Acrylic.
+    // internal: real-time app-internal Acrylic over the decorative backdrop.
+    // image: same Acrylic over the in-app background image (recognizable
+    // outlines, independent of DWM; feasibility doc Image Mode).
     // solid: opaque theme fill.
     component LabPanel: Item {
         id: panel
@@ -199,14 +212,14 @@ ApplicationWindow {
         property real translucency: 0.55   // 0..1, 1 = opaque
         property string panelName: ""
 
-        // internal: real-time app-internal Acrylic.
+        // internal/image: real-time app-internal Acrylic.
         // solid: same component with the opaque fallback so the panel keeps
         // the unified material language (border + noise) without blur/tint.
         AcrylicSurface {
             anchors.fill: parent
             visible: root.mode !== "native"
             radius: panel.radius
-            sourceItem: backdropLayer
+            sourceItem: root.mode === "image" ? imageBackdropLayer : backdropLayer
             opaqueFallback: root.mode === "solid"
             objectName: panel.panelName.length > 0 ? panel.panelName + "Acrylic" : ""
         }
@@ -291,6 +304,13 @@ ApplicationWindow {
                     ghost: true
                     selected: root.mode === "solid"
                     onClicked: root.applyMode("solid")
+                }
+                AppButton {
+                    objectName: "ngModeImage"
+                    text: "image"
+                    ghost: true
+                    selected: root.mode === "image"
+                    onClicked: root.applyMode("image")
                 }
                 AppButton {
                     objectName: "ngThemeButton"

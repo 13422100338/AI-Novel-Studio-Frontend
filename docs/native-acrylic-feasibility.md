@@ -35,7 +35,11 @@
 - 独立实验入口：`python -m ai_novel_studio.ui_qml --native-glass-lab`
 - `src/ai_novel_studio/ui_qml/qml/NativeGlassLab.qml`：标题、三块半透明卡片、
   正文、控制面板（Native ON/OFF、Acrylic/Mica、深浅主题、前景染色透明度
-  0.05–0.45、面板不透明度 0.5–1.0、DWM 日志行）
+  0.05–0.45、面板不透明度 0.5–1.0、DWM 日志行）、以及新增的 **image 模式**
+  （BlockHelm 的 Image Mode 等价物，见第 6 节）
+- `src/ai_novel_studio/ui_qml/qml/surfaces/ImageBackdropSource.qml`（新增）：
+  QML 版“应用内背景图”，用 Canvas 绘制固定高对比场景（月亮、远山、灯塔、
+  海面、船），供 Acrylic 表面实时模糊；大几何轮廓在 25–60px 模糊后仍可辨
 - `src/ai_novel_studio/ui_qml/bridge/windows_backdrop.py`：
   `extend_frame_into_client_area`（MARGINS=-1）+ `system_backdrop_result`
   （返回 `hwnd_valid / extend_frame_hresult / set_backdrop_hresult /
@@ -81,7 +85,7 @@ native_backdrop_result:
 | 红/青交界 | 混合色 std≈99 | 材质真实采样窗口后方 |
 | 纯青半区 | 纯青 (0,188,212) | 颜色跟随后方内容 |
 
-综合判定：**PARTIAL（推荐进入正式产品，作为可选增强）**
+综合判定（DWM Acrylic）：**PARTIAL（已接入正式 Shell，作为可选增强）**
 
 - ✅ 窗口后方桌面/程序综合色彩明显参与；
 - ✅ 移动窗口时背景实时更新（DWM 系统合成，无 JS/应用轮询）；
@@ -91,6 +95,11 @@ native_backdrop_result:
   不是实现缺陷；
 - ⚠️ 深色主题下材质差异明显，浅色主题下对比度低（浅色材质接近白色）。
 
+轮廓可见性：**由 Image Mode 解决（Lab `image` 模式）**——应用内背景图 +
+实时模糊（`ImageBackdropSource` + `AcrylicSurface`），月亮/灯塔/山轮廓可辨。
+这是 BlockHelm 采用的两条路线之一；正式 Shell 若要“轮廓清晰玻璃”，应走
+Image Mode（应用内壁纸/场景模糊），DWM Acrylic 保留为“系统级色调跟随”。
+
 ## 6. 已接入正式 Shell
 
 - `App.qml` + `bootstrap.py`：`python -m ai_novel_studio.ui_qml` 默认启用
@@ -98,6 +107,24 @@ native_backdrop_result:
   失败路径保持不透明。
 - 证据：`docs/frontend/screenshots/glass-shell-*`，屏幕级标题栏背景条
   acrylic std≈55 vs solid std≈12。
+
+## 6.1 BlockHelm 源码结论（轮廓可见性的答案）
+
+查阅 BlockHelm（zqq-699/BlockHelm-Launcher，GPL-3.0，用户已豁免复制限制；
+本项目按官方 DWM API 独立实现、未复制其代码）后确认：
+
+- **Acrylic Mode（DWM）**：`NativeBackdrop.cs` 与我们一致——extend frame
+  (-1) + `DWMSBT_TRANSIENTWINDOW` + dark mode + corner/border。此路线
+  轮廓弱是系统特性。
+- **Image Mode（轮廓清晰的路线）**：`ImageBackdropSource` 专门渲染一张
+  背景图，`BackdropBlurBorder` 用 VisualBrush 采样该图 + `BlurEffect`
+  （低分辨率 BitmapCache 保证性能）。轮廓清晰是因为**模糊的是应用自己的
+  背景图**，与 DWM 无关。
+
+QML 等价物已实现：`ImageBackdropSource.qml`（背景图）+ `AcrylicSurface`
+（`ShaderEffectSource` + `MultiEffect` blur，等价 VisualBrush + BlurEffect）。
+Lab 中点击 `image` 模式即可对比：卡片模糊出月亮/灯塔/山的可辨轮廓，
+不再只是均匀色调。
 
 ## 7. 已知限制
 
@@ -110,7 +137,9 @@ native_backdrop_result:
 
 ## 8. 结论
 
-**YES（可在 Client Area 真正暴露 Desktop Acrylic）**，且已默认接入正式
-写作 Shell。效果上限由 Windows 系统材质决定（色调跟随 + 大半径模糊），
-达不到“iOS 式轮廓清晰玻璃”；若要轮廓级玻璃，需另开“应用内壁纸模糊”
-实验（internal glass 路线），与本次 native 实验相互独立。
+- **DWM Acrylic**：YES（可在 Client Area 真正暴露），已默认接入正式写作
+  Shell；效果上限由系统材质决定（色调跟随 + 大半径模糊）。
+- **轮廓级玻璃**：BlockHelm 的答案是 **Image Mode**（应用内背景图 +
+  Gaussian Blur），QML 等价物已在 Lab `image` 模式复现并通过截图验证
+  （背景区非纯色、轮廓可辨）；如需正式接入写作界面，以此为基线做
+  “应用内壁纸/场景模糊”即可，与 native 实验相互独立。

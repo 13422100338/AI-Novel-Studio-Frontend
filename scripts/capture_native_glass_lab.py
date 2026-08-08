@@ -78,6 +78,7 @@ _STATES = (
     ("native-acrylic-dark", "native", "acrylic", "dark"),
     ("native-mica-dark", "native", "mica", "dark"),
     ("internal-dark", "internal", "acrylic", "dark"),
+    ("image-dark", "image", "acrylic", "dark"),
     ("solid-dark", "solid", "acrylic", "dark"),
     ("native-acrylic-light", "native", "acrylic", "light"),
     ("solid-light", "solid", "acrylic", "light"),
@@ -218,6 +219,7 @@ def _set_mode(app: QGuiApplication, window: QQuickWindow, mode: str) -> None:
         "native": "ngModeNative",
         "internal": "ngModeInternal",
         "solid": "ngModeSolid",
+        "image": "ngModeImage",
     }[mode]
     _click(window, button)
     _pump(app, 8)

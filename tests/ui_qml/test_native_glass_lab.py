@@ -373,3 +373,27 @@ def test_dwm_log_panel_reports_ok_and_failure(qtbot: QtBot) -> None:
     assert "HWND OK" in text
     assert "ACRYLIC" in text
     assert "Visual PARTIAL" in text
+
+
+def test_image_mode_blurs_in_app_backdrop_image(qtbot: QtBot) -> None:
+    """'image' mode samples the ImageBackdropSource and keeps blur active."""
+    _, _, theme, _, window = _load_lab(qtbot)
+    theme.setVisualQuality("premium")
+    qtbot.wait(30)
+    image_layer = _find_item(_content(window), "ngImageBackdropLayer")
+    assert image_layer is not None
+    assert image_layer.property("visible") is False
+
+    image_button = _find_item(_content(window), "ngModeImage")
+    assert image_button is not None
+    QMetaObject.invokeMethod(image_button, "clicked")
+    qtbot.wait(50)
+
+    assert window.property("mode") == "image"
+    assert image_layer.property("visible") is True
+    for panel in ("ngNav", "ngChapter", "ngCardCandidates", "ngCardActions"):
+        acrylic = _find_item(_content(window), panel + "Acrylic")
+        assert acrylic is not None, f"missing {panel}Acrylic"
+        src = acrylic.property("sourceItem")
+        assert src is not None and src.objectName() == "ngImageBackdropLayer"
+        assert acrylic.property("blurEnabled") is True
