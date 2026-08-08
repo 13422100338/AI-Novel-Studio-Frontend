@@ -552,12 +552,20 @@ ApplicationWindow {
                 }
             }
 
-            // 3. Central manuscript (high-opacity reading surface).
-            PaperSurface {
+            // 3. Central manuscript (glass reading surface).
+            // Was an opaque PaperSurface: the opaque white sheet covered the
+            // DWM backdrop across the visual focus area, so the "window
+            // behind" effect was invisible in practice. Now it is a glass
+            // panel like the others: the backdrop (DWM acrylic or the in-app
+            // backdrop) shows through the translucent fill while the text
+            // stays readable.
+            LabPanel {
                 objectName: "ngManuscript"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 radius: 12
+                translucency: 0.55
+                panelName: "ngManuscript"
 
                 Flickable {
                     id: manuscriptFlick
