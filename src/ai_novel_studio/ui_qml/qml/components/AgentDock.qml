@@ -28,6 +28,9 @@ Item {
     // the other columns). When null the panel keeps its original opaque fill,
     // so standalone harnesses and non-shell uses are unaffected.
     property Item backdropSource: null
+    // BlockHelm-style native glass: use a lighter translucent tint so the DWM
+    // material behind the window shows through (no in-app blur here).
+    property bool nativeGlassActive: false
     // Theme tokens are strings; type them first so .r/.g/.b resolve
     // (Qt.rgba(undefined) silently paints black, see DragSheet §18.2).
     readonly property color glassColor: Theme.tokens.color.bgSurface
@@ -54,7 +57,9 @@ Item {
                 root.glassColor.r,
                 root.glassColor.g,
                 root.glassColor.b,
-                Theme.visualQuality === "premium" ? 0.86 : 0.94
+                root.nativeGlassActive
+                    ? 0.42
+                    : (Theme.visualQuality === "premium" ? 0.86 : 0.94)
             )
             : Theme.tokens.color.bgSurface
         border.color: Theme.tokens.color.border

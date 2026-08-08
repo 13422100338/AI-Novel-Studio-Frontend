@@ -174,6 +174,7 @@ ApplicationWindow {
                 Layout.preferredWidth: 56
                 Layout.fillHeight: true
                 backdropSource: backgroundLayer
+                nativeGlassActive: window.nativeGlass && window.nativeActive
             }
 
             // Sidebar host is glass over the same backdrop (unified material
@@ -185,6 +186,7 @@ ApplicationWindow {
                 Layout.preferredWidth: window.sidebarVisible ? 280 : 0
                 Layout.fillHeight: true
                 sourceItem: backgroundLayer
+                nativeGlassActive: window.nativeGlass && window.nativeActive
                 radius: 0
                 clip: true
 
@@ -230,6 +232,7 @@ ApplicationWindow {
                 open: Facade.aiDrawerOpen
                 windowWidth: window.width
                 backdropSource: backgroundLayer
+                nativeGlassActive: window.nativeGlass && window.nativeActive
                 onClosed: Facade.toggleAiDrawer(false)
             }
 

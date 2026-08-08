@@ -136,6 +136,24 @@ def test_theme_change_syncs_dark_mode(qtbot: QtBot) -> None:
     qtbot.waitUntil(lambda: bridge.dark_mode_calls[-1] is False)
 
 
+def test_native_glass_shell_uses_tint_not_in_app_blur(qtbot: QtBot) -> None:
+    """BlockHelm-style native glass: panels are translucent tints, no blur."""
+    bridge = FakeNativeGlassBridge()
+    bridge.apply_result = True
+    engine, _, _ = _load_shell(qtbot, use_native_glass=True, bridge=bridge)
+    window = engine.rootObjects()[0]
+    assert bridge.apply("acrylic") is True
+    qtbot.waitUntil(lambda: window.property("nativeActive") is True)
+
+    for name in ("navRailGlass", "sidebarHost", "manuscriptHost"):
+        surface = _find_item(window.contentItem(), name)
+        assert surface is not None, f"missing {name}"
+        assert surface.property("nativeGlassActive") is True
+        assert surface.property("blurEnabled") is False
+        alpha = QColor(surface.property("nativeGlassFill")).alpha()
+        assert 0 < alpha < 255, f"{name} should be a translucent tint"
+
+
 def test_shell_glass_retry_timer_is_bounded(qtbot: QtBot) -> None:
     """The DWM retry counter exists and stays bounded for tests."""
     bridge = FakeNativeGlassBridge()

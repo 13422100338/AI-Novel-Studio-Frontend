@@ -92,6 +92,7 @@ Item {
             Layout.fillHeight: true
             radius: Theme.tokens.radius.r16
             sourceItem: root.backdropSource
+            nativeGlassActive: root.nativeGlassActive
             clip: true
 
             ScrollView {

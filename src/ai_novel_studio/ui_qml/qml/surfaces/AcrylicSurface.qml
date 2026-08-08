@@ -41,6 +41,11 @@ Item {
     // translucency). Used only by the standalone experiment page; the
     // production shell keeps the existing Safe-tier behavior.
     property bool opaqueFallback: false
+    // BlockHelm-style native glass: the shell window already carries the DWM
+    // Desktop Acrylic backdrop, so this panel must NOT re-blur an in-app
+    // backdrop. It renders as a translucent theme tint only, letting the
+    // window-behind content show through the window-level material.
+    property bool nativeGlassActive: false
 
     // ---------------------------------------------------------------------
     // Behavior / test hooks. Safe tier degrades to a fully opaque surface
@@ -48,14 +53,21 @@ Item {
     // real-time capture and blur while the panel is visible.
     // ---------------------------------------------------------------------
     readonly property bool effectActive:
-        visible && !root.opaqueFallback && Theme.visualQuality !== "safe"
+        visible && !root.opaqueFallback && !root.nativeGlassActive
+        && Theme.visualQuality !== "safe"
         && root.sourceItem !== null
     readonly property bool blurEnabled: root.effectActive
     readonly property rect captureRect: capture.sourceRect
     readonly property color fillColor:
-        root.opaqueFallback || Theme.visualQuality === "safe"
+        root.opaqueFallback || root.nativeGlassActive
+            || Theme.visualQuality === "safe"
             ? Theme.tokens.color.bgSurface
             : Qt.rgba(tintBase.r, tintBase.g, tintBase.b, root.tintOpacity)
+    // Native-glass fill: a translucent theme tint so text stays readable
+    // while the DWM material shows the desktop/other windows behind it.
+    readonly property color nativeGlassFill:
+        Qt.rgba(tintBase.r, tintBase.g, tintBase.b, root.nativeGlassTintOpacity)
+    property real nativeGlassTintOpacity: 0.42
 
     property color tintBase: Theme.tokens.material.acrylicTint
     // Tier separation: Balanced keeps a more solid tint (glass reads as
@@ -164,7 +176,7 @@ Item {
         id: fill
         anchors.fill: parent
         radius: root.radius
-        color: root.fillColor
+        color: root.nativeGlassActive ? root.nativeGlassFill : root.fillColor
         border.color: Theme.tokens.color.border
         border.width: 1
 

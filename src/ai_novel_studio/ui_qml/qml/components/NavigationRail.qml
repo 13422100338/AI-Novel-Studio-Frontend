@@ -12,11 +12,14 @@ Item {
     // language as VisualLab). Without it the rail keeps its original opaque
     // background, so standalone uses are unaffected.
     property Item backdropSource: null
+    // BlockHelm-style native glass: translucent tint only, no in-app blur.
+    property bool nativeGlassActive: false
 
     AcrylicSurface {
         anchors.fill: parent
         visible: root.backdropSource !== null
         sourceItem: root.backdropSource
+        nativeGlassActive: root.nativeGlassActive
         radius: 0
         objectName: "navRailGlass"
     }
